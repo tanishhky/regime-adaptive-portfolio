@@ -106,11 +106,22 @@ class FuzzyAggregator:
             # Brier score
             return float(np.mean((composite - D) ** 2))
 
+        # Bounds: steepness a in [1, 50], crossover c in [0.05, 0.95],
+        # raw weights in [-5, 5].  Prevents degenerate sigmoid parameters
+        # that zero out detectors (e.g. c=1082 effectively disables a detector).
+        bounds = []
+        for i in range(self.N_DETECTORS):
+            bounds.append((1.0, 50.0))    # a_i: steepness
+            bounds.append((0.05, 0.95))   # c_i: crossover
+        for i in range(self.N_DETECTORS):
+            bounds.append((-5.0, 5.0))    # raw_w_i
+
         result = minimize(
             objective,
             x0,
-            method="Nelder-Mead",
-            options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-8},
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={"maxiter": 5000, "ftol": 1e-10},
         )
 
         best = result.x

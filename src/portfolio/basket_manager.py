@@ -72,7 +72,7 @@ class BasketManager:
                     continue
                 port_ret = self._simulate_returns(
                     p_stress_series, aligned_ret, assignments,
-                    vol_dict, entry_th, exit_th,
+                    vol_dict, entry_th, exit_th, risk_free_daily,
                 )
                 excess = port_ret - risk_free_daily
                 if excess.std() > 0:
@@ -95,6 +95,7 @@ class BasketManager:
         vol_dict: dict[str, float],
         entry_th: float,
         exit_th: float,
+        risk_free_daily: float = 0.0,
     ) -> pd.Series:
         """Simulate portfolio returns for a given threshold pair."""
         tickers = list(returns_df.columns)
@@ -109,7 +110,10 @@ class BasketManager:
                 entry_th, exit_th, liquidated, structural_break=False,
             )
             day_ret = returns_df.iloc[t].values
-            port_ret[t] = np.nansum(weights * day_ret)
+            equity_ret = np.nansum(weights * day_ret)
+            # Bug 6: include cash return so cash drag is priced correctly
+            cash_weight = max(0.0, 1.0 - weights.sum())
+            port_ret[t] = equity_ret + cash_weight * risk_free_daily
 
         return pd.Series(port_ret, index=returns_df.index)
 
@@ -188,15 +192,24 @@ class BasketManager:
                 raw[i] = inv_vol * (1.0 - p_stress)
 
             elif ba.basket == "C":
-                # Core: hold unless structural break
+                # Bug 5b: graduated de-risking at extreme stress.
+                # Core assets start reducing at P(stress) > 0.7 and fully
+                # liquidate at P(stress) = 1.0.  Below 0.7 they're held at
+                # full weight (stable "hold" behaviour preserved).
                 if structural_break:
                     raw[i] = 0.0
+                elif p_stress > 0.7:
+                    # Linear scale-down: full weight at 0.7, zero at 1.0
+                    scale = max(0.0, (1.0 - p_stress) / 0.3)
+                    raw[i] = inv_vol * scale
                 else:
                     raw[i] = inv_vol
 
-        # Normalise to sum to 1 (or 0 if all liquidated)
+        # Bug 6: allow implicit cash — do NOT force weights to sum to 1.
+        # The freed weight IS the risk reduction.  Only normalize if total
+        # exceeds 1.0 (prevents leverage), otherwise the remainder is cash.
         total = raw.sum()
-        if total > 0:
+        if total > 1.0:
             raw /= total
         return raw
 

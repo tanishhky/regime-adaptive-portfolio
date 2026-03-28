@@ -1,17 +1,20 @@
 """
 CUSUM sequential detector — ultra-short time-scale (5-10 day).
 
-Implements the Page (1954) CUSUM sequential analysis test on daily returns.
-The allowance parameter k and decision threshold h are calibrated from data
-(no hardcoded values).
+Implements the Page (1954) CUSUM sequential analysis test on z-score-
+standardized daily returns. The allowance parameter k and decision threshold
+h are calibrated from data (no hardcoded values).
 
 Mathematics
 -----------
-S_t^+ = max(0, S_{t-1}^+ + (r_t - μ₀ - k))    # upward CUSUM
-S_t^- = max(0, S_{t-1}^- - (r_t - μ₀ + k))    # downward CUSUM
+z_t = (r_t - μ₀) / σ_train     # standardize to zero-mean, unit-variance
 
-k = 0.5 * δ  where δ = σ_train  (one-std shift to detect)
-h ≈ (ln(ARL₀) + 1.166) / δ     (Siegmund 1985 approximation, ARL₀ = 252)
+S_t^+ = max(0, S_{t-1}^+ + (z_t - k))    # upward CUSUM on z-scores
+S_t^- = max(0, S_{t-1}^- - (z_t + k))    # downward CUSUM on z-scores
+
+k = 0.5  (half the shift size in standardized space; detecting a 1σ shift)
+h ≈ (ln(ARL₀) + 1.166) / δ  with δ=1.0  (Siegmund 1985 approximation)
+  → h ≈ 6.70 for ARL₀ = 252
 
 References
 ----------
@@ -40,6 +43,7 @@ class CUSUMDetector:
         """
         self.target_arl0 = target_arl0
         self.mu0: float = 0.0
+        self.sigma: float = 1.0
         self.delta: float = 0.0
         self.k: float = 0.0
         self.h: float = 0.0
@@ -56,11 +60,15 @@ class CUSUMDetector:
         """
         clean = returns.dropna()
         self.mu0 = float(clean.mean())
-        # δ = 1 standard deviation of training returns (data-driven shift size)
-        self.delta = float(clean.std(ddof=1))
-        # Allowance parameter  (Page, 1954)
-        self.k = 0.5 * self.delta
+        # Store sigma for z-score standardization in signal()
+        self.sigma = float(clean.std(ddof=1))
+        # Fix: apply CUSUM to z-score-standardized returns.
+        # δ = 1.0 by definition in standardized space (detecting a 1σ shift).
+        self.delta = 1.0
+        # Allowance parameter k = 0.5 * δ (Page, 1954)
+        self.k = 0.5
         # Decision threshold via Siegmund (1985) approximation
+        # With δ=1.0 and ARL₀=252: h ≈ (ln(252) + 1.166) / 1.0 ≈ 6.70
         self.h = (np.log(self.target_arl0) + 1.166) / self.delta
         # Reset accumulators
         self._s_plus = 0.0
@@ -80,8 +88,13 @@ class CUSUMDetector:
             Continuous signal in [0, 1].  Values near 1 indicate a detected
             mean shift (stress).
         """
-        self._s_plus = max(0.0, self._s_plus + (r_t - self.mu0 - self.k))
-        self._s_minus = max(0.0, self._s_minus - (r_t - self.mu0 + self.k))
+        # Guard against near-zero sigma (e.g. near-constant prices in training)
+        if self.sigma < 1e-8:
+            return 0.0
+        # Standardize: z_t is already demeaned, so no mu subtraction in CUSUM update
+        z_t = (r_t - self.mu0) / self.sigma
+        self._s_plus = max(0.0, self._s_plus + (z_t - self.k))
+        self._s_minus = max(0.0, self._s_minus - (z_t + self.k))
         raw = max(self._s_plus, self._s_minus) / self.h if self.h > 0 else 0.0
         return min(raw, 1.0)
 

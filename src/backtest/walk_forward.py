@@ -299,10 +299,9 @@ class WalkForwardEngine:
 
             # ── 6. Reset detectors for test window ────────────────────
             self.cusum.reset_accumulators()
-
-            # ── 7. Run day-by-day through test window ─────────────────
-            structural_signal_val = self.structural.signal(0.0)
-            structural_break = structural_signal_val > 0.5
+            # Note: Markov _daily_buffer should be clear at window start.
+            # The filter state (_filtered_prob) persists intentionally.
+            self.markov._daily_buffer.clear()
 
             window_returns: list[float] = []
 
@@ -325,6 +324,10 @@ class WalkForwardEngine:
                     "markov": sig_markov,
                     "structural": sig_struct,
                 }
+
+                # Bug 5a: update structural_break live each day instead of
+                # computing it once per window (which was always False).
+                structural_break = sig_struct > 0.5
 
                 # Aggregate signals
                 if self.use_neural:
@@ -373,6 +376,9 @@ class WalkForwardEngine:
                     r = float(sector_ret[tkr].iloc[day_idx])
                     if not np.isnan(r):
                         day_ret += w * r
+                # Bug 6: add cash return for undeployed weight
+                cash_weight = max(0.0, 1.0 - sum(new_weights.values()))
+                day_ret += cash_weight * float(rf_series.iloc[day_idx])
                 day_ret -= cost  # Deduct transaction costs
 
                 # Record outcome for neural manager
