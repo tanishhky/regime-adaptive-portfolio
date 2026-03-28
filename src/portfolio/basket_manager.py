@@ -163,55 +163,71 @@ class BasketManager:
         liquidated: set[str],
         structural_break: bool,
     ) -> np.ndarray:
-        """Core weight computation logic."""
-        n = len(tickers)
-        raw = np.zeros(n)
+        """Core weight computation logic.
 
+        Works in two steps to avoid the raw inv_vol normalization trap:
+
+        Step 1: Compute base inverse-vol weights that sum to 1.0 (calm portfolio).
+        Step 2: Apply basket-specific stress scalings as multipliers on those
+                base weights. The reduced sum is implicit cash — do NOT
+                re-normalize. Raw inv_vol values sum to ~25 for 11 stocks,
+                so normalizing AFTER scaling always collapses cash to zero.
+        """
+        n = len(tickers)
+
+        # Step 1: base inverse-vol weights summing to 1.0
+        base = np.zeros(n)
+        for i, tkr in enumerate(tickers):
+            if tkr not in assignments:
+                continue
+            vol = vol_dict.get(tkr, 0.2)
+            base[i] = 1.0 / max(vol, 1e-6)
+        base_total = base.sum()
+        if base_total > 0:
+            base /= base_total
+        # base now sums to 1.0 — the calm-market fully-invested portfolio
+
+        # Step 2: apply basket-specific stress scaling
+        scaled = np.zeros(n)
         for i, tkr in enumerate(tickers):
             if tkr not in assignments:
                 continue
             ba = assignments[tkr]
-            vol = vol_dict.get(tkr, 0.2)
-            inv_vol = 1.0 / max(vol, 1e-6)
 
             if ba.basket == "A":
                 # Tactical: liquidate on high stress, re-enter on recovery
                 if p_stress > entry_th:
                     liquidated.add(tkr)
-                    raw[i] = 0.0
+                    scaled[i] = 0.0
                 elif p_stress < exit_th and tkr in liquidated:
                     liquidated.discard(tkr)
-                    raw[i] = inv_vol
+                    scaled[i] = base[i]
                 elif tkr in liquidated:
-                    raw[i] = 0.0
+                    scaled[i] = 0.0
                 else:
-                    raw[i] = inv_vol
+                    scaled[i] = base[i]
 
             elif ba.basket == "B":
-                # Avoid: continuous de-risking
-                raw[i] = inv_vol * (1.0 - p_stress)
+                # Avoid: continuous de-risking proportional to stress
+                scaled[i] = base[i] * (1.0 - p_stress)
 
             elif ba.basket == "C":
-                # Bug 5b: graduated de-risking at extreme stress.
-                # Core assets start reducing at P(stress) > 0.7 and fully
-                # liquidate at P(stress) = 1.0.  Below 0.7 they're held at
-                # full weight (stable "hold" behaviour preserved).
+                # Core: graduated de-risking only at extreme stress (>0.7)
                 if structural_break:
-                    raw[i] = 0.0
+                    scaled[i] = 0.0
                 elif p_stress > 0.7:
                     # Linear scale-down: full weight at 0.7, zero at 1.0
                     scale = max(0.0, (1.0 - p_stress) / 0.3)
-                    raw[i] = inv_vol * scale
+                    scaled[i] = base[i] * scale
                 else:
-                    raw[i] = inv_vol
+                    scaled[i] = base[i]
 
-        # Bug 6: allow implicit cash — do NOT force weights to sum to 1.
-        # The freed weight IS the risk reduction.  Only normalize if total
-        # exceeds 1.0 (prevents leverage), otherwise the remainder is cash.
-        total = raw.sum()
-        if total > 1.0:
-            raw /= total
-        return raw
+        # Step 3: NO re-normalization. The sum of scaled < 1.0 is the cash.
+        # Only guard against floating-point leverage.
+        total = scaled.sum()
+        if total > 1.0 + 1e-8:
+            scaled /= total
+        return scaled
 
     def reset(self) -> None:
         """Reset liquidation state (for new walk-forward window)."""

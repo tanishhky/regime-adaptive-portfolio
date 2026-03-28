@@ -90,13 +90,20 @@ class FuzzyAggregator:
         # Raw weights (will be softmaxed for sum-to-1 constraint)
         x0[2 * self.N_DETECTORS :] = np.zeros(self.N_DETECTORS)
 
+        # Minimum weight per detector: 5% floor so no detector is zeroed out.
+        # softmax([-5]) ≈ 0.0007 which is effectively zero despite bounds;
+        # the floor guarantees every detector contributes meaningfully.
+        # With 4 detectors the floor uses 20%, leaving 80% for the optimizer.
+        floor = 0.05
+
         def objective(params: np.ndarray) -> float:
             """Brier score objective."""
             a_c = params[: 2 * self.N_DETECTORS].reshape(self.N_DETECTORS, 2)
             raw_w = params[2 * self.N_DETECTORS :]
-            # Softmax for weights
+            # Softmax then floor so the optimizer sees the actual weights used
             exp_w = np.exp(raw_w - np.max(raw_w))
-            w = exp_w / exp_w.sum()
+            softmax_w = exp_w / exp_w.sum()
+            w = floor + (1.0 - self.N_DETECTORS * floor) * softmax_w
 
             composite = np.zeros(n)
             for i in range(self.N_DETECTORS):
@@ -130,7 +137,9 @@ class FuzzyAggregator:
         )
         raw_w = best[2 * self.N_DETECTORS :]
         exp_w = np.exp(raw_w - np.max(raw_w))
-        self.weights = exp_w / exp_w.sum()
+        softmax_w = exp_w / exp_w.sum()
+        # Apply the same floor used inside the objective
+        self.weights = floor + (1.0 - self.N_DETECTORS * floor) * softmax_w
 
     # ── inference ─────────────────────────────────────────────────────────
 
