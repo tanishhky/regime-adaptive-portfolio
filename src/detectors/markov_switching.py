@@ -8,6 +8,10 @@ Fits a 2-state Markov-Switching model on SPY weekly returns using
 smoothed probability (which uses future data and would introduce lookahead
 bias).
 
+During OOS windows a recursive Hamilton filter update is applied each time
+5 daily returns accumulate (pseudo-weekly), so the stress probability
+evolves in real time rather than being frozen at the training endpoint.
+
 References
 ----------
 Hamilton, J.D. (1989). "A new approach to the economic analysis of
@@ -31,6 +35,14 @@ class MarkovSwitchingDetector:
         self.model_result = None
         self._transition_matrix: np.ndarray | None = None
         self._last_filtered_prob: float = 0.5
+        # Attributes for the recursive Hamilton filter used in signal()
+        self._transition_matrix_2x2: np.ndarray | None = None
+        self._mu: np.ndarray | None = None
+        self._sigma2: np.ndarray | None = None
+        self._filtered_prob: float = 0.5
+        self._stress_state: int = 1
+        # Buffer accumulates daily returns until a pseudo-week (5 obs) is ready
+        self._daily_buffer: list[float] = []
 
     def fit(self, returns: pd.Series) -> None:
         """Fit Markov-Switching model on weekly aggregated returns.
@@ -65,8 +77,6 @@ class MarkovSwitchingDetector:
         # Identify which state is the stress (high-vol) state
         # State with higher variance = stress
         params = self.model_result.params
-        # MarkovRegression stores sigma parameters; regime with larger
-        # variance is "stress"
         variances = self.model_result.sigma2_regimes if hasattr(
             self.model_result, "sigma2_regimes"
         ) else None
@@ -89,6 +99,36 @@ class MarkovSwitchingDetector:
             if hasattr(filtered, "iloc")
             else filtered[self._stress_state][-1]
         )
+
+        # Extract parameters for the recursive Hamilton filter used in signal()
+        # Transition matrix: shape (2, 2, 1) -> squeeze to (2, 2)
+        try:
+            tm = np.array(self.model_result.regime_transition)
+            if tm.ndim == 3:
+                tm = tm[:, :, 0]
+            self._transition_matrix_2x2 = tm
+        except Exception:
+            self._transition_matrix_2x2 = np.array([[0.95, 0.05], [0.05, 0.95]])
+
+        # State means (params indices 2 and 3 for trend="c" with 2 regimes)
+        try:
+            self._mu = np.array([float(params[2]), float(params[3])])
+        except (IndexError, KeyError):
+            self._mu = np.array([0.0, -0.01])
+
+        # State variances (sigma2 per regime)
+        try:
+            if variances is not None:
+                self._sigma2 = np.array([float(variances[0]), float(variances[1])])
+            else:
+                self._sigma2 = np.array([float(params[-2]), float(params[-1])])
+        except (IndexError, KeyError):
+            self._sigma2 = np.array([1e-4, 4e-4])
+
+        # Initialize filter state at end of training
+        self._filtered_prob = self._last_filtered_prob
+        # Clear the daily accumulation buffer
+        self._daily_buffer.clear()
 
     def _identify_stress_state(
         self, weekly: pd.Series, filtered: np.ndarray
@@ -116,25 +156,58 @@ class MarkovSwitchingDetector:
         return np.array(self.model_result.regime_transition)
 
     def signal(self, r_t: float) -> float:
-        """Return current stress probability.
+        """Return current stress probability via recursive Hamilton filter.
 
-        In the test window the model is not re-fit daily; instead the
-        filtered probability is carried forward (a conservative approach
-        that avoids lookahead).  The signal is updated at each walk-forward
-        recalibration.
+        Accumulates daily returns into a pseudo-weekly buffer and updates
+        the filter once per 5 observations to avoid scale mismatch between
+        the daily input and the weekly emission parameters.
 
         Parameters
         ----------
         r_t : float
-            Today's log return (unused between recalibrations, but kept
-            in the API for consistency).
+            Today's log return.
 
         Returns
         -------
         float
             P(stress) ∈ [0, 1].
         """
-        return self._last_filtered_prob
+        if self.model_result is None:
+            return 0.5
+
+        # Accumulate daily returns; update filter once per pseudo-week (5 days)
+        self._daily_buffer.append(r_t)
+        if len(self._daily_buffer) < 5:
+            return self._filtered_prob
+
+        # Aggregate to pseudo-weekly return
+        weekly_r = sum(self._daily_buffer)
+        self._daily_buffer.clear()
+
+        # Prediction step: ξ_{t|t-1} = P' @ ξ_{t-1|t-1}
+        # prob_vec: [P(calm), P(stress)]
+        prob_vec = np.array([1.0 - self._filtered_prob, self._filtered_prob])
+        predicted = self._transition_matrix_2x2.T @ prob_vec
+
+        # Likelihood step: η_j = N(weekly_r | μ_j, σ²_j)
+        eta = np.zeros(2)
+        for j in range(2):
+            var_j = max(self._sigma2[j], 1e-10)
+            eta[j] = (
+                np.exp(-0.5 * (weekly_r - self._mu[j]) ** 2 / var_j)
+                / np.sqrt(2 * np.pi * var_j)
+            )
+
+        # Update step: ξ_{t|t} = (ξ_{t|t-1} ⊙ η) / (1' (ξ_{t|t-1} ⊙ η))
+        joint = predicted * eta
+        denom = joint.sum()
+        if denom > 0:
+            updated = joint / denom
+        else:
+            updated = predicted  # fallback to prediction if likelihood underflows
+
+        self._filtered_prob = float(np.clip(updated[self._stress_state], 0.0, 1.0))
+        return self._filtered_prob
 
     def signal_series(self, returns: pd.Series) -> pd.Series:
         """Return filtered stress probabilities for training data.

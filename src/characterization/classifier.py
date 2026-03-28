@@ -64,44 +64,53 @@ class BasketClassifier:
 
         # Collect metrics
         half_lives = []
-        var99s = []
         vols = []
         for tkr in tickers:
             gr = garch_results[tkr]
             rr = recovery_results[tkr]
             hl = rr.half_life if rr.mean_reverting else np.inf
             half_lives.append(hl)
-            var99s.append(float(gr.conditional_var99.iloc[-1]))
             vols.append(gr.last_vol)
 
-        half_lives_arr = np.array(half_lives)
-        var99s_arr = np.array(var99s)
+        vols_arr = np.array(vols)
+        hl_arr = np.array(half_lives)
 
-        # Data-driven boundaries
-        # Replace inf with a large number for median computation
-        finite_hl = half_lives_arr[np.isfinite(half_lives_arr)]
-        half_life_median = float(np.median(finite_hl)) if len(finite_hl) > 0 else 30.0
-        # VaR is negative; 75th percentile of |VaR| = most negative quartile
-        cvar_75 = float(np.percentile(var99s_arr, 25))  # 25th pctile (most negative)
+        # Fix: use tercile boundaries on conditional volatility instead of
+        # the 25th-percentile VaR boundary.  The old VaR threshold placed
+        # ~75% of assets in Basket C, leaving almost nothing to actively
+        # manage.  Terciles guarantee a roughly 1/3 split.
+        vol_33 = float(np.percentile(vols_arr, 33.3))
+        vol_67 = float(np.percentile(vols_arr, 66.7))
+
+        # Half-life boundary: median of finite half-lives
+        finite_hl = hl_arr[np.isfinite(hl_arr)]
+        hl_median = float(np.median(finite_hl)) if len(finite_hl) > 0 else 30.0
 
         assignments: dict[str, BasketAssignment] = {}
         for i, tkr in enumerate(tickers):
-            hl = half_lives_arr[i]
-            v99 = var99s_arr[i]
+            vol = vols_arr[i]
+            hl = hl_arr[i]
 
-            if v99 < cvar_75:  # High vol (more negative VaR)
-                if hl < half_life_median:
-                    basket = "A"  # Tactical: fast recovery + high vol
+            if vol > vol_67:            # Top tercile volatility
+                if hl < hl_median:
+                    basket = "A"        # Tactical: high vol, fast recovery
                 else:
-                    basket = "B"  # Avoid: slow recovery + high vol
-            else:
-                basket = "C"      # Core: low vol
+                    basket = "B"        # Avoid: high vol, slow recovery
+            elif vol > vol_33:          # Middle tercile volatility
+                if hl < hl_median:
+                    basket = "A"        # Tactical: medium vol, fast recovery
+                else:
+                    basket = "C"        # Core: medium vol, slow recovery
+            else:                       # Bottom tercile volatility
+                basket = "C"            # Core: low vol (hold)
 
+            # Store VaR for backward compatibility
+            var99 = float(garch_results[tkr].conditional_var99.iloc[-1])
             assignments[tkr] = BasketAssignment(
                 ticker=tkr,
                 basket=basket,
                 half_life=float(hl),
-                cond_var99=float(v99),
+                cond_var99=var99,
                 cond_vol=vols[i],
             )
 
