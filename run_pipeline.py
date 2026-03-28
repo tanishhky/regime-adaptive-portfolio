@@ -51,7 +51,6 @@ def main() -> None:
 
     port_ret = results["strategy_returns"]
     bench_ret = results["benchmark_returns"]
-    ew_ret = results["equal_weight_returns"]
     print(f"  Backtest period: {port_ret.index[0].date()} to {port_ret.index[-1].date()}")
     print(f"  Total OOS days: {len(port_ret)}")
 
@@ -67,12 +66,10 @@ def main() -> None:
         stress_signals=results["stress_signals"],
     )
     m_benchmark = compute_metrics(bench_ret, rf_daily)
-    m_equalweight = compute_metrics(ew_ret, rf_daily)
 
     metrics_table = metrics_to_df({
         "Regime-Adaptive": m_strategy,
         "SPY (Buy & Hold)": m_benchmark,
-        "Equal-Weight Sector": m_equalweight,
     })
     print("\n" + metrics_table.to_string())
 

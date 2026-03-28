@@ -306,13 +306,10 @@ class WalkForwardEngine:
         )
 
         bench_ret = spy_ret.reindex(port_ret.index).fillna(0)
-        ew_ret = sector_ret.reindex(port_ret.index).fillna(0).mean(axis=1)
-        ew_ret.name = "equal_weight"
 
         return {
             "strategy_returns": port_ret,
             "benchmark_returns": bench_ret,
-            "equal_weight_returns": ew_ret,
             "stress_signals": stress_sig,
             "detector_signals": detector_df,
             "turnover": turnover_s,

@@ -203,7 +203,6 @@ def plot_asset_scatter(
 def plot_backtest(
     strategy: pd.Series,
     benchmark: pd.Series,
-    equal_weight: pd.Series,
     metrics_strategy: Any = None,
     save: bool = True,
 ) -> plt.Figure:
@@ -213,11 +212,10 @@ def plot_backtest(
                                     gridspec_kw={"height_ratios": [3, 1]},
                                     sharex=True)
 
-    # Cumulative returns (log scale)
+    # Cumulative returns
     for series, label, color in [
         (strategy, "Regime-Adaptive", "#2c3e50"),
         (benchmark, "SPY (Buy & Hold)", "#7f8c8d"),
-        (equal_weight, "Equal-Weight Sector", "#bdc3c7"),
     ]:
         cum = series.cumsum()
         ax1.plot(cum.index, np.exp(cum.values) - 1, label=label,
@@ -454,7 +452,6 @@ def generate_all_figures(results: dict, prices: pd.DataFrame, **kwargs) -> None:
     plot_backtest(
         results["strategy_returns"],
         results["benchmark_returns"],
-        results["equal_weight_returns"],
         metrics_strategy=m,
     )
 
