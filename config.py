@@ -37,35 +37,3 @@ SECTOR_ETFS: dict[str, str] = {
 
 BENCHMARK: str = "SPY"
 VIX_TICKER: str = "^VIX"
-
-# ── Neural Enhancement Parameters ────────────────────────────────────────────
-ATTENTION_LOOKBACK: int = 63           # Trading days of signal history for attention
-LSTM_HIDDEN_DIM: int = 128
-LSTM_NUM_LAYERS: int = 2
-POLICY_LR: float = 3e-4
-PPO_CLIP_EPS: float = 0.2
-PPO_ENTROPY_COEF: float = 0.01
-PPO_N_EPOCHS: int = 4
-PPO_BATCH_SIZE: int = 64
-REPLAY_BUFFER_SIZE: int = 50000
-REPLAY_BETA: float = 0.5              # Exponential recency decay rate
-LAMBDA_DD: float = 5.0                # Drawdown penalty coefficient
-LAMBDA_TURNOVER: float = 0.1          # Turnover penalty coefficient
-COLD_START_WINDOWS: int = 2           # Walk-forward windows before policy is trusted
-N_POLICY_HEADS: int = 3               # For multi-head policy (Phase 3)
-USE_MULTI_HEAD: bool = True           # Toggle multi-head vs single-head
-
-# ── Strategy V2 Parameters ───────────────────────────────────────────────────
-ORACLE_LOOKBACK: int = 21             # Days of hindsight for oracle
-ORACLE_RISK_AVERSION: float = 2.0     # Risk aversion in oracle QP
-IMITATION_LR: float = 1e-3
-IMITATION_EPOCHS: int = 30
-POLICY_STATE_DIM: int = 99
-POLICY_HIDDEN_DIM: int = 128
-POLICY_N_LAYERS: int = 2
-POLICY_N_HEADS: int = 3               # Multi-head regime gating
-DIVERGENCE_LOOKBACK: int = 42
-DIVERGENCE_THRESHOLD: float = -1.5
-PUT_ENABLED: bool = True              # Toggle put overlay
-CASH_ENABLED: bool = True             # Toggle cash management
-TRADE_LEDGER_ENABLED: bool = True
