@@ -1,7 +1,7 @@
 """
 Basket classifier — assigns sector ETFs to tactical baskets.
 
-Uses data-driven boundaries (median half-life, 75th percentile VaR) to
+Uses data-driven boundaries (tercile vol boundaries, median half-life) to
 classify each ETF into one of three baskets at each rebalance date.
 
 Basket A (Tactical) : fast recovery + high vol → liquidate on stress, re-enter

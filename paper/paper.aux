@@ -11,76 +11,71 @@
 \citation{takagi1985}
 \citation{nystrup2017}
 \citation{kirby2012}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
 \citation{page1954}
 \citation{killick2012}
 \citation{siegmund1985}
-\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {3}System Architecture}{3}{section.3}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces System architecture. Four detectors spanning 5-day to 252+-day horizons feed into a Brier-score-optimized fuzzy aggregator. The composite stress probability drives adaptive basket allocation with implicit cash as the risk-reduction mechanism. All parameters are re-estimated at each walk-forward step.}}{4}{figure.caption.1}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
 \newlabel{fig:architecture}{{1}{4}{System architecture. Four detectors spanning 5-day to 252+-day horizons feed into a Brier-score-optimized fuzzy aggregator. The composite stress probability drives adaptive basket allocation with implicit cash as the risk-reduction mechanism. All parameters are re-estimated at each walk-forward step}{figure.caption.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology}{4}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Multi-Scale Detector Ensemble}{4}{subsection.4.1}\protected@file@percent }
 \citation{page1954}
 \citation{siegmund1985}
 \citation{longerstaey1996}
 \citation{hamilton1989}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Multi-Scale Detector Ensemble}{5}{subsection.4.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.1}CUSUM Sequential Detector (5--10 day)}{5}{subsubsection.4.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.2}EWMA Volatility Crossover (21--42 day)}{5}{subsubsection.4.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.3}Hamilton Markov-Switching with Recursive Filter (63--126 day)}{5}{subsubsection.4.1.3}\protected@file@percent }
 \citation{killick2012}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.3}Hamilton Markov-Switching with Recursive Filter (63--126 day)}{6}{subsubsection.4.1.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Hamilton regime-switching transition matrix estimated from SPY weekly returns. Both states exhibit high persistence, with the bull-to-stress transition probability (0.093) exceeding the stress-to-bull probability (0.037), consistent with asymmetric market dynamics.}}{6}{figure.caption.2}\protected@file@percent }
+\newlabel{fig:transition}{{2}{6}{Hamilton regime-switching transition matrix estimated from SPY weekly returns. Both states exhibit high persistence, with the bull-to-stress transition probability (0.093) exceeding the stress-to-bull probability (0.037), consistent with asymmetric market dynamics}{figure.caption.2}{}}
 \citation{takagi1985}
 \citation{brier1950}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.4}Structural Break Detection (252+ day)}{7}{subsubsection.4.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Fuzzy Aggregation Framework}{7}{subsection.4.2}\protected@file@percent }
 \citation{bollerslev1986,engle1982}
 \citation{uhlenbeck1930}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.1.4}Structural Break Detection (252+ day)}{6}{subsubsection.4.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Fuzzy Aggregation Framework}{6}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Asset Characterization and Basket Construction}{6}{subsection.4.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Calibrated Takagi-Sugeno sigmoid membership functions for each detector. The crossover point $c$ (dashed line) marks where the stress membership equals 0.5. CUSUM activates at moderate signal levels ($c = 0.45$), while the remaining detectors require near-extreme signals ($c = 0.95$), reflecting their complementary time-scales.}}{8}{figure.caption.3}\protected@file@percent }
+\newlabel{fig:membership}{{3}{8}{Calibrated Takagi-Sugeno sigmoid membership functions for each detector. The crossover point $c$ (dashed line) marks where the stress membership equals 0.5. CUSUM activates at moderate signal levels ($c = 0.45$), while the remaining detectors require near-extreme signals ($c = 0.95$), reflecting their complementary time-scales}{figure.caption.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Asset Characterization}{8}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}GARCH(1,1)-$t$ Conditional Volatility}{8}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Ornstein-Uhlenbeck Recovery Half-Life}{8}{subsubsection.4.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Adaptive Basket Construction}{9}{subsection.4.4}\protected@file@percent }
 \citation{kirby2012}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Sector ETF basket classification based on conditional $|\text  {VaR}(99\%)|$ (x-axis) and OU recovery half-life (y-axis). Data-driven boundaries (median half-life and 75th percentile VaR) determine basket assignment. XLE (fast recovery, high vol) is Tactical; XLF and XLY (slow recovery, high vol) are Avoid; the remaining low-vol sectors are Core.}}{10}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:scatter}{{4}{10}{Sector ETF basket classification based on conditional $|\text {VaR}(99\%)|$ (x-axis) and OU recovery half-life (y-axis). Data-driven boundaries (median half-life and 75th percentile VaR) determine basket assignment. XLE (fast recovery, high vol) is Tactical; XLF and XLY (slow recovery, high vol) are Avoid; the remaining low-vol sectors are Core}{figure.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Implicit Cash Allocation}{10}{subsection.4.5}\protected@file@percent }
 \citation{fama2015}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Implicit Cash Allocation}{7}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Walk-Forward Validation}{7}{subsection.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{7}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Data}{7}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Portfolio Performance}{7}{subsection.5.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Walk-forward out-of-sample performance (2009--2025)}}{8}{table.caption.2}\protected@file@percent }
-\newlabel{tab:performance}{{1}{8}{Walk-forward out-of-sample performance (2009--2025)}{table.caption.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Out-of-sample equity curves (top) and drawdown profiles (bottom), 2009--2025. The regime-adaptive strategy matches SPY's terminal wealth while exhibiting substantially shallower drawdowns. The COVID-19 drawdown reached $-19.6\%$ versus $-41.7\%$ for SPY.}}{9}{figure.caption.3}\protected@file@percent }
-\newlabel{fig:equity}{{2}{9}{Out-of-sample equity curves (top) and drawdown profiles (bottom), 2009--2025. The regime-adaptive strategy matches SPY's terminal wealth while exhibiting substantially shallower drawdowns. The COVID-19 drawdown reached $-19.6\%$ versus $-41.7\%$ for SPY}{figure.caption.3}{}}
-\newlabel{fig:bars}{{3a}{10}{Risk-adjusted performance ratios}{figure.caption.4}{}}
-\newlabel{sub@fig:bars}{{a}{10}{Risk-adjusted performance ratios}{figure.caption.4}{}}
-\newlabel{fig:drawdown}{{3b}{10}{Maximum drawdown comparison}{figure.caption.4}{}}
-\newlabel{sub@fig:drawdown}{{b}{10}{Maximum drawdown comparison}{figure.caption.4}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Performance comparison across all three strategies. The regime-adaptive approach achieves superior risk-adjusted returns (a) with a maximum drawdown 53\% smaller than SPY (b).}}{10}{figure.caption.4}\protected@file@percent }
-\newlabel{fig:performance_comparison}{{3}{10}{Performance comparison across all three strategies. The regime-adaptive approach achieves superior risk-adjusted returns (a) with a maximum drawdown 53\% smaller than SPY (b)}{figure.caption.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Rolling Performance Stability}{10}{subsection.5.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces 252-day rolling Sharpe ratio. The regime-adaptive strategy maintains consistently higher risk-adjusted returns, with the largest outperformance occurring during and after stress periods.}}{11}{figure.caption.5}\protected@file@percent }
-\newlabel{fig:rolling}{{4}{11}{252-day rolling Sharpe ratio. The regime-adaptive strategy maintains consistently higher risk-adjusted returns, with the largest outperformance occurring during and after stress periods}{figure.caption.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Annual Return Decomposition}{11}{subsection.5.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Annual return comparison. The strategy participates in bull markets while significantly outperforming during drawdown years (2020, 2022), demonstrating the value of regime-responsive cash allocation.}}{12}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:annual}{{5}{12}{Annual return comparison. The strategy participates in bull markets while significantly outperforming during drawdown years (2020, 2022), demonstrating the value of regime-responsive cash allocation}{figure.caption.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Multi-Scale Detector Response}{12}{subsection.5.5}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Multi-scale detector response during the COVID-19 crash (January--June 2020). Top panel: SPY price. Lower panels: individual detector signals. The CUSUM fires within one day, followed by EWMA (days), Markov (weeks), and structural break (months)---each contributing at its native time-scale.}}{13}{figure.caption.7}\protected@file@percent }
-\newlabel{fig:detector_covid}{{6}{13}{Multi-scale detector response during the COVID-19 crash (January--June 2020). Top panel: SPY price. Lower panels: individual detector signals. The CUSUM fires within one day, followed by EWMA (days), Markov (weeks), and structural break (months)---each contributing at its native time-scale}{figure.caption.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Detector Contribution Analysis}{13}{subsection.5.6}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Left: calibrated sigmoid membership functions showing each detector's activation profile. Right: Brier-score-optimized detector weights with 5\% minimum floor (dashed line). CUSUM dominates at $\sim $78\%, consistent with the value of rapid z-score-based detection.}}{14}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:membership}{{7}{14}{Left: calibrated sigmoid membership functions showing each detector's activation profile. Right: Brier-score-optimized detector weights with 5\% minimum floor (dashed line). CUSUM dominates at $\sim $78\%, consistent with the value of rapid z-score-based detection}{figure.caption.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Cash Allocation Dynamics}{14}{subsection.5.7}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Composite stress probability (top) and portfolio cash allocation (bottom) over the full out-of-sample period. Stress spikes produce proportional increases in cash, with the largest allocations during COVID-19 (2020) and the rate-hiking cycle (2022). The dashed line marks the 0.7 threshold above which Core basket scaling activates.}}{15}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:stress_cash}{{8}{15}{Composite stress probability (top) and portfolio cash allocation (bottom) over the full out-of-sample period. Stress spikes produce proportional increases in cash, with the largest allocations during COVID-19 (2020) and the rate-hiking cycle (2022). The dashed line marks the 0.7 threshold above which Core basket scaling activates}{figure.caption.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces COVID-19 case study (February--July 2020). Top: relative performance of the strategy vs.\ SPY. Bottom: portfolio equity and cash weights. The strategy moved to $\sim $79\% cash within days of the crash onset and gradually re-entered during recovery.}}{16}{figure.caption.10}\protected@file@percent }
-\newlabel{fig:covid_zoom}{{9}{16}{COVID-19 case study (February--July 2020). Top: relative performance of the strategy vs.\ SPY. Bottom: portfolio equity and cash weights. The strategy moved to $\sim $79\% cash within days of the crash onset and gradually re-entered during recovery}{figure.caption.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8}Basket Classification}{16}{subsection.5.8}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Sector ETF basket classification based on GARCH conditional volatility (y-axis) and OU recovery half-life (x-axis). Tercile boundaries on volatility and median half-life determine basket assignment. Higher-volatility sectors with fast recovery (Tactical) are actively traded; those with slow recovery (Avoid) are continuously de-risked.}}{17}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:scatter}{{10}{17}{Sector ETF basket classification based on GARCH conditional volatility (y-axis) and OU recovery half-life (x-axis). Tercile boundaries on volatility and median half-life determine basket assignment. Higher-volatility sectors with fast recovery (Tactical) are actively traded; those with slow recovery (Avoid) are continuously de-risked}{figure.caption.11}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{17}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The Normalization Problem}{17}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Detector Scale Invariance}{18}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Limitations}{18}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Robustness}{18}{subsection.6.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{18}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Walk-Forward Validation}{11}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{11}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Data}{11}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Portfolio Performance}{11}{subsection.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Walk-Forward Out-of-Sample Performance (2009--2025)}}{11}{table.caption.5}\protected@file@percent }
+\newlabel{tab:performance}{{1}{11}{Walk-Forward Out-of-Sample Performance (2009--2025)}{table.caption.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Walk-forward out-of-sample backtest (2009--2025). Top: cumulative returns for the regime-adaptive strategy versus SPY buy-and-hold. Bottom: strategy drawdown profile. The strategy matches SPY's terminal wealth while maintaining maximum drawdowns below 20\%.}}{12}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:backtest}{{5}{12}{Walk-forward out-of-sample backtest (2009--2025). Top: cumulative returns for the regime-adaptive strategy versus SPY buy-and-hold. Bottom: strategy drawdown profile. The strategy matches SPY's terminal wealth while maintaining maximum drawdowns below 20\%}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Rolling Performance Stability}{12}{subsection.5.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces 252-day rolling Sharpe ratio. The regime-adaptive strategy maintains consistently higher risk-adjusted returns, with the largest outperformance occurring during and after stress periods.}}{13}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:rolling}{{6}{13}{252-day rolling Sharpe ratio. The regime-adaptive strategy maintains consistently higher risk-adjusted returns, with the largest outperformance occurring during and after stress periods}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Multi-Scale Detector Response}{13}{subsection.5.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Multi-scale regime detection system (2009--2025). From top: (1)~SPY price with regime shading (green = calm, red = stress); (2)~individual detector signals showing complementary time-scales; (3)~composite $P(\text  {stress})$ from fuzzy aggregation with 0.5 threshold marked; (4)~portfolio drawdown profile. The system identifies major stress events (2011 European debt crisis, 2015--16 China/oil shock, 2018 Q4, COVID-19, 2022 rate hikes) with distinct multi-scale signatures.}}{14}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:regime}{{7}{14}{Multi-scale regime detection system (2009--2025). From top: (1)~SPY price with regime shading (green = calm, red = stress); (2)~individual detector signals showing complementary time-scales; (3)~composite $P(\text {stress})$ from fuzzy aggregation with 0.5 threshold marked; (4)~portfolio drawdown profile. The system identifies major stress events (2011 European debt crisis, 2015--16 China/oil shock, 2018 Q4, COVID-19, 2022 rate hikes) with distinct multi-scale signatures}{figure.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Detector signal intensity heatmap (2009--2025). Each row represents one detector; color intensity indicates signal strength from 0 (pale) to 1 (dark red). The complementary time-scales are visible: CUSUM produces sharp, transient spikes; EWMA shows broader volatility regimes; Markov exhibits persistent state transitions; structural break maintains a lower-frequency background signal.}}{15}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:heatmap}{{8}{15}{Detector signal intensity heatmap (2009--2025). Each row represents one detector; color intensity indicates signal strength from 0 (pale) to 1 (dark red). The complementary time-scales are visible: CUSUM produces sharp, transient spikes; EWMA shows broader volatility regimes; Markov exhibits persistent state transitions; structural break maintains a lower-frequency background signal}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Detector Contribution Analysis}{15}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Sector Recovery Dynamics}{15}{subsection.5.6}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Sector recovery paths from peak during COVID-19 (left) and the 2022 rate-hiking cycle (right), colored by basket assignment (red = Tactical, orange = Avoid, green = Core). Recovery speed differences validate the OU half-life classification: Basket~A sectors recover fastest from the COVID trough, while Basket~B sectors lag. During 2022, Energy (XLE, red) exhibits dramatic divergence, demonstrating regime-dependent sector dynamics.}}{16}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:recovery}{{9}{16}{Sector recovery paths from peak during COVID-19 (left) and the 2022 rate-hiking cycle (right), colored by basket assignment (red = Tactical, orange = Avoid, green = Core). Recovery speed differences validate the OU half-life classification: Basket~A sectors recover fastest from the COVID trough, while Basket~B sectors lag. During 2022, Energy (XLE, red) exhibits dramatic divergence, demonstrating regime-dependent sector dynamics}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{16}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The Normalization Problem}{16}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Detector Scale Invariance}{16}{subsection.6.2}\protected@file@percent }
 \bibstyle{plainnat}
 \bibcite{ang2002}{{1}{2002}{{Ang and Bekaert}}{{}}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Limitations}{17}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Robustness}{17}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{17}{section.7}\protected@file@percent }
 \bibcite{bollerslev1986}{{2}{1986}{{Bollerslev}}{{}}}
 \bibcite{brier1950}{{3}{1950}{{Brier}}{{}}}
 \bibcite{engle1982}{{4}{1982}{{Engle}}{{}}}
@@ -95,4 +90,4 @@
 \bibcite{siegmund1985}{{13}{1985}{{Siegmund}}{{}}}
 \bibcite{takagi1985}{{14}{1985}{{Takagi and Sugeno}}{{}}}
 \bibcite{uhlenbeck1930}{{15}{1930}{{Uhlenbeck and Ornstein}}{{}}}
-\gdef \@abspage@last{19}
+\gdef \@abspage@last{18}
