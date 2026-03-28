@@ -1,0 +1,666 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=blue!70!black,
+    urlcolor=blue!70!black,
+}
+
+\onehalfspacing
+
+\graphicspath{{fig/}}
+
+\title{\textbf{Multi-Scale Regime Detection with Fuzzy Aggregation\\for Adaptive Sector Portfolio Management}}
+
+\author{
+Tanishk Yadav\thanks{ORCID: 0009-0006-2382-9411.}\\
+\textit{MS Financial Engineering}\\
+NYU Tandon School of Engineering\\
+New York, NY, USA
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% ─── ABSTRACT ────────────────────────────────────────────────────────────────
+\begin{abstract}
+\noindent
+We propose a multi-scale regime detection framework that fuses four
+complementary detectors---CUSUM sequential analysis on z-score
+returns, EWMA volatility crossover, Hamilton Markov-switching with a
+recursive out-of-sample filter, and PELT structural break
+detection---into a unified stress probability via Takagi-Sugeno fuzzy
+inference with bounded L-BFGS-B optimization.  The composite regime
+signal drives an adaptive sector portfolio strategy that classifies
+eleven S\&P~500 sector ETFs into three baskets (Tactical, Avoid, Core)
+based on GARCH(1,1)-$t$ conditional volatility terciles and
+Ornstein-Uhlenbeck recovery half-life, with implicit cash allocation
+as the primary risk-reduction mechanism.  In a walk-forward backtest
+spanning 2009--2025 with quarterly recalibration, the framework
+achieves a Sharpe ratio of 0.78, a maximum drawdown of $-19.60\%$
+(versus $-41.71\%$ for SPY), and a Calmar ratio of 0.59, while
+capturing 98\% of the benchmark return at 73\% of its volatility.
+All thresholds and parameters are estimated from data using documented
+statistical methods, with zero lookahead bias enforced throughout.
+
+\medskip
+\noindent\textbf{Keywords:} regime detection, fuzzy inference, portfolio management, CUSUM, Markov switching, GARCH, walk-forward validation, implicit cash allocation
+\end{abstract}
+
+% ─── INTRODUCTION ────────────────────────────────────────────────────────────
+\section{Introduction}
+
+Financial markets exhibit regime-dependent behavior characterized by
+distinct periods of calm, transition, and stress
+\citep{hamilton1989}.  Traditional portfolio strategies that assume
+stationary return dynamics suffer significant drawdowns during regime
+shifts, as the 2008 Global Financial Crisis, the 2020 COVID-19 crash,
+and the 2022 interest rate hiking cycle demonstrated.  Even
+diversified portfolios that hold all sectors with equal or
+risk-proportional weights cannot avoid the synchronous drawdowns
+that characterize systemic stress events.
+
+The central challenge in regime-adaptive portfolio management is
+\emph{timely} and \emph{reliable} regime detection.  Individual
+detectors operate on different time-scales and suffer from distinct
+failure modes: short-term indicators produce false alarms during
+idiosyncratic volatility, while long-term models react too slowly to
+protect against rapid drawdowns.  The secondary challenge is
+translating regime signals into portfolio actions that actually reduce
+risk: a system that detects stress but merely redistributes weight
+among risky assets---rather than moving to cash---provides limited
+drawdown protection.
+
+This paper addresses both challenges.  We propose an ensemble
+architecture that fuses four complementary detectors through a
+Takagi-Sugeno fuzzy inference system \citep{takagi1985}, combined with
+an adaptive basket allocation framework where implicit cash allocation
+serves as the primary risk-reduction mechanism.
+
+Our contributions are fourfold:
+\begin{enumerate}[itemsep=2pt]
+    \item A multi-scale detector ensemble spanning ultra-short (5-day)
+          to long-term (252+ day) horizons, with CUSUM operating on
+          z-score-standardized returns for scale invariance and
+          Markov-switching using a recursive Hamilton filter for
+          real-time out-of-sample updates.
+    \item A fuzzy aggregation framework that learns optimal detector
+          weights and membership functions by minimizing the Brier
+          score against realized drawdowns, with bounded optimization
+          and minimum weight floors to prevent detector suppression.
+    \item A tercile-based basket construction methodology that
+          classifies sector ETFs using GARCH(1,1)-$t$ conditional
+          volatility and Ornstein-Uhlenbeck recovery dynamics, with
+          graduated Core-basket response to extreme stress.
+    \item An implicit cash mechanism where stress-induced weight
+          reduction produces sub-unity portfolio allocation,
+          with the deficit earning the risk-free rate rather than
+          being redistributed to other risky assets.
+\end{enumerate}
+
+% ─── RELATED WORK ────────────────────────────────────────────────────────────
+\section{Related Work}
+
+\citet{hamilton1989} introduced Markov-switching models for business
+cycle analysis, establishing the foundation for regime-based asset
+allocation.  \citet{ang2002} extended this framework to international
+asset allocation, demonstrating that regime-switching models can
+improve out-of-sample portfolio performance when properly calibrated.
+
+\citet{gradojevic2013} demonstrated the effectiveness of fuzzy logic
+systems for financial decision-making under uncertainty.  The
+Takagi-Sugeno framework \citep{takagi1985} provides a principled
+approach to combining multiple information sources with calibratable
+membership functions.  Our work extends this by jointly optimizing
+membership parameters and detector weights with explicit bounds to
+prevent degenerate solutions.
+
+\citet{nystrup2017} showed that regime-based asset allocation
+outperforms static strategies when the regime model is properly
+calibrated.  \citet{kirby2012} demonstrated that simple timing
+strategies based on inverse-volatility weighting outperform na\"ive
+diversification.  Our framework builds on inverse-volatility weighting
+as the base allocation and adds regime-dependent scaling with an
+implicit cash buffer.
+
+\citet{page1954} introduced the CUSUM procedure for sequential change
+detection.  \citet{killick2012} proposed the PELT algorithm for
+optimal change-point detection with linear computational cost.
+\citet{siegmund1985} derived average run length approximations for setting CUSUM
+decision thresholds.  We apply CUSUM to z-score-standardized returns
+to achieve scale-invariant detection thresholds.
+
+% ─── ARCHITECTURE ────────────────────────────────────────────────────────────
+\section{System Architecture}
+
+Figure~\ref{fig:architecture} presents the complete system architecture. The framework operates in four layers: data acquisition, multi-scale detection with fuzzy aggregation, asset characterization and classification, and adaptive portfolio construction with implicit cash allocation. All parameters are re-estimated at each quarterly walk-forward step using only past data, ensuring zero lookahead bias.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{architecture.pdf}
+\caption{System architecture. Four detectors spanning 5-day to 252+-day horizons feed into a Brier-score-optimized fuzzy aggregator. The composite stress probability drives adaptive basket allocation with implicit cash as the risk-reduction mechanism. All parameters are re-estimated at each walk-forward step.}
+\label{fig:architecture}
+\end{figure}
+
+% ─── METHODOLOGY ─────────────────────────────────────────────────────────────
+\section{Methodology}
+
+\subsection{Multi-Scale Detector Ensemble}
+
+We deploy four detectors targeting complementary time-scales (Figure~\ref{fig:detector_covid} illustrates their coordinated response during the COVID-19 crash).  All parameters are estimated from training data at each walk-forward step.
+
+\subsubsection{CUSUM Sequential Detector (5--10 day)}
+Following \citet{page1954}, we maintain upward and downward CUSUM
+accumulators on \emph{z-score-standardized} returns:
+\begin{equation}
+    z_t = \frac{r_t - \hat{\mu}_0}{\hat{\sigma}_{\text{train}}}
+\end{equation}
+\begin{align}
+    S_t^+ &= \max(0,\; S_{t-1}^+ + z_t - k) \\
+    S_t^- &= \max(0,\; S_{t-1}^- - z_t - k)
+\end{align}
+where $\hat{\mu}_0$ and $\hat{\sigma}_{\text{train}}$ are the mean and
+standard deviation of training-window returns, $k = 0.5$ (detecting a
+1$\sigma$ shift in standardized space), and the decision threshold is
+$h = (\ln(\text{ARL}_0) + 1.166) / \delta$ with $\delta = 1$ per
+\citet{siegmund1985}, yielding $h \approx 6.70$ for a target average
+run length of 252 trading days.  The signal is
+$\min(\max(S_t^+, S_t^-)/h,\; 1)$.
+
+Operating in z-score space makes the threshold \emph{scale-invariant}: a
+single $-5\%$ daily return (approximately $z = -4.2$) produces a signal
+of $\sim\!0.55$, while three consecutive $-2\%$ days ($z \approx -1.7$
+each) yield a signal of $\sim\!0.54$.  Under the original raw-return
+formulation, the threshold was approximately 558, requiring over
+12{,}000 consecutive crash days to trigger---rendering the detector
+inoperative.
+
+\subsubsection{EWMA Volatility Crossover (21--42 day)}
+Two EWMA volatility estimators with decay factors
+$\lambda_{\text{fast}}$ and $\lambda_{\text{slow}}$ are calibrated via
+maximum likelihood estimation \citep{longerstaey1996}:
+\begin{equation}
+    \hat{\sigma}^2_{\cdot,t} = \lambda_\cdot\, \hat{\sigma}^2_{\cdot,t-1}
+                       + (1 - \lambda_\cdot)\, r_t^2
+\end{equation}
+with $\lambda_{\text{fast}} \in [0.85, 0.96]$ and
+$\lambda_{\text{slow}} \in [0.95, 0.995]$.  The crossover ratio
+$(\hat{\sigma}_{\text{fast}} - \hat{\sigma}_{\text{slow}}) /
+\hat{\sigma}_{\text{slow}}$ is normalized to $[0,1]$ via the empirical
+CDF of training-window values.
+
+\subsubsection{Hamilton Markov-Switching with Recursive Filter (63--126 day)}
+We fit a 2-state Markov-switching regression \citep{hamilton1989} on
+weekly SPY returns:
+\begin{equation}
+    r_t \mid S_t = i \;\sim\; \mathcal{N}(\mu_i, \sigma_i^2),
+    \quad i \in \{0, 1\}
+\end{equation}
+During the out-of-sample window, rather than holding the filtered
+probability constant, we implement a \emph{recursive Hamilton filter
+update}.  Daily returns are accumulated into a pseudo-weekly buffer,
+and every 5 trading days the filter is updated via the standard
+predict--likelihood--update cycle:
+\begin{equation}
+    \boldsymbol{\xi}_{t|t} =
+    \frac{\boldsymbol{\xi}_{t|t-1} \odot \boldsymbol{\eta}}
+         {\mathbf{1}^\top(\boldsymbol{\xi}_{t|t-1} \odot
+         \boldsymbol{\eta})}
+\end{equation}
+where $\boldsymbol{\xi}_{t|t-1} = \mathbf{P}^\top
+\boldsymbol{\xi}_{t-1|t-1}$ is the prediction step using the
+transition matrix $\mathbf{P}$, and $\eta_j = \phi(r_t^{(w)};\,
+\mu_j, \sigma_j^2)$ are state-conditional likelihoods of the
+pseudo-weekly return.  The signal is
+$P(S_t = \text{stress} \mid r_1, \ldots, r_t)$.
+
+\subsubsection{Structural Break Detection (252+ day)}
+Using the PELT algorithm \citep{killick2012}, we detect structural
+breaks in the cumulative return series with a BIC-calibrated penalty
+$\lambda = \ln(n) \cdot \hat{\sigma}^2$.  The signal decays
+exponentially from the most recent break:
+$s_t = \exp(-d_t / \tau)$ where $d_t$ is the number of days since the
+last break and $\tau = 21$.
+
+\subsection{Fuzzy Aggregation Framework}
+
+Each detector signal $x_i \in [0,1]$ passes through a calibrated
+sigmoid membership function \citep{takagi1985}:
+\begin{equation}
+    \mu_{\text{stress}}(x_i) = \frac{1}{1 + \exp(-a_i(x_i - c_i))}
+\end{equation}
+The composite stress probability is:
+\begin{equation}
+    P(\text{stress}) = \sum_{i=1}^{4} w_i \cdot
+                       \mu_{\text{stress}}(x_i), \quad
+                       \sum w_i = 1,\; w_i \geq w_{\min}
+\end{equation}
+
+Parameters $\{a_i, c_i, w_i\}$ are jointly optimized by minimizing the
+Brier score \citep{brier1950}:
+\begin{equation}
+    \mathcal{L}_{\text{Brier}} = \frac{1}{T}\sum_{t=1}^{T}
+    \bigl(P_{\text{composite},t} - D_t\bigr)^2
+\end{equation}
+where $D_t = 1$ if a drawdown exceeding the 10th percentile of
+training-window drawdowns occurs within the next 21 trading days.
+Optimization uses L-BFGS-B with bounds: $a_i \in [1, 50]$,
+$c_i \in [0.05, 0.95]$, raw weights $\tilde{w}_i \in [-5, 5]$
+(mapped through softmax).  A minimum weight floor of
+$w_{\min} = 0.05$ is applied:
+\begin{equation}
+    w_i = w_{\min} + (1 - 4 w_{\min}) \cdot
+    \text{softmax}(\tilde{w})_i
+\end{equation}
+Figure~\ref{fig:membership} shows the calibrated membership functions and optimized detector weights.
+
+\subsection{Asset Characterization and Basket Construction}
+
+Each sector ETF is characterized by GARCH(1,1)-$t$ conditional
+volatility \citep{bollerslev1986, engle1982} and Ornstein-Uhlenbeck
+recovery half-life \citep{uhlenbeck1930}.  Figure~\ref{fig:scatter}
+shows the resulting classification landscape.  Sectors are assigned to
+three baskets using \emph{tercile} boundaries on conditional volatility
+(33rd and 67th percentiles) combined with median half-life:
+
+\begin{itemize}[itemsep=4pt]
+    \item \textbf{Basket~A (Tactical):} Top or middle tercile vol with
+          fast recovery.  Binary liquidation above the calibrated
+          entry threshold; re-entry below the exit threshold.
+    \item \textbf{Basket~B (Avoid):} Top tercile vol with slow
+          recovery.  Continuous de-risking:
+          $w_i = w_i^{\text{base}} \cdot (1 - P(\text{stress}))$.
+    \item \textbf{Basket~C (Core):} Bottom tercile vol.  Graduated
+          linear scaling above $P(\text{stress}) = 0.7$:
+          \begin{equation}
+              w_i = w_i^{\text{base}} \cdot
+              \max\!\left(0,\;
+              \frac{1 - P(\text{stress})}{0.3}\right)
+          \end{equation}
+\end{itemize}
+
+\subsection{Implicit Cash Allocation}
+
+Base weights are computed using inverse-volatility weighting
+\citep{kirby2012}, \emph{normalized to sum to 1.0 before any stress
+scaling is applied}.  After basket-specific stress scaling:
+\begin{equation}
+    W_{\text{total}} = \sum_{i} w_i \leq 1.0, \qquad
+    w_{\text{cash}} = 1 - W_{\text{total}}
+\end{equation}
+The deficit earns the daily risk-free rate.  This design avoids a
+critical pitfall: when stressed assets are de-weighted and renormalized
+to sum to 1.0, the freed capacity is redistributed to remaining
+assets, potentially \emph{increasing} concentration risk during stress.
+By allowing sub-unity exposure, the system achieves genuine risk reduction.
+
+\subsection{Walk-Forward Validation}
+
+The system is validated using expanding-window walk-forward analysis
+with a 504-day (2-year) minimum training window and 63-day (quarterly)
+out-of-sample steps.  At each step, \emph{all} parameters are
+re-estimated from training data only.  Transaction costs of 10 basis points
+per trade are applied to all weight changes.
+
+% ─── RESULTS ─────────────────────────────────────────────────────────────────
+\section{Results}
+
+\subsection{Data}
+
+We use daily close prices for eleven S\&P~500 sector ETFs (XLK, XLF,
+XLE, XLV, XLI, XLY, XLP, XLU, XLRE, XLB, XLC) plus SPY as benchmark,
+spanning January 2007 to December 2025.  Fama-French five-factor data
+\citep{fama2015} provides the daily risk-free rate.  The out-of-sample
+evaluation period covers 4{,}274 trading days from January 2009 to
+December 2025.
+
+\subsection{Portfolio Performance}
+
+Table~\ref{tab:performance} summarizes the out-of-sample results.
+The regime-adaptive strategy captures 98.5\% of SPY's annualized
+return (11.61\% vs.\ 11.79\%) while reducing volatility by 26\%
+(13.22\% vs.\ 17.98\%) and maximum drawdown by 53\%
+($-$19.60\% vs.\ $-$41.71\%).
+
+\begin{table}[H]
+\caption{Walk-forward out-of-sample performance (2009--2025)}
+\label{tab:performance}
+\centering
+\begin{tabular}{lccc}
+\toprule
+                    & \textbf{Regime-}  & \textbf{SPY} & \textbf{Equal-} \\
+\textbf{Metric}     & \textbf{Adaptive} & \textbf{B\&H} & \textbf{Weight} \\
+\midrule
+Ann.\ Return        & 11.61\%  & 11.79\%  & 8.52\%  \\
+Ann.\ Volatility    & 13.22\%  & 17.98\%  & 16.05\% \\
+Sharpe Ratio        & \textbf{0.78} & 0.58 & 0.45    \\
+Sortino Ratio       & \textbf{0.75} & 0.54 & 0.42    \\
+Calmar Ratio        & \textbf{0.59} & 0.28 & 0.18    \\
+Max Drawdown        & \textbf{$-$19.60\%} & $-$41.71\% & $-$46.40\%\\
+Max DD Duration     & \textbf{226d} & 512d     & 530d    \\
+Ann.\ Turnover      & 4.01     & ---      & ---     \\
+Regime Transitions  & 116      & ---      & ---     \\
+Hit Rate            & 91.6\%   & ---      & ---     \\
+False Alarm Rate    & 8.4\%    & ---      & ---     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Sharpe ratio of 0.78 exceeds SPY's 0.58 by 34\%, driven entirely
+by volatility reduction rather than return enhancement.  The Calmar
+ratio more than doubles that of the benchmark (0.59 vs.\ 0.28),
+indicating substantially improved drawdown-adjusted performance.
+Figure~\ref{fig:equity} shows the cumulative equity curves alongside
+the drawdown profiles, and Figure~\ref{fig:bars} presents the
+risk-adjusted metric comparisons.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{equity_curves.pdf}
+\caption{Out-of-sample equity curves (top) and drawdown profiles (bottom), 2009--2025. The regime-adaptive strategy matches SPY's terminal wealth while exhibiting substantially shallower drawdowns. The COVID-19 drawdown reached $-19.6\%$ versus $-41.7\%$ for SPY.}
+\label{fig:equity}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{performance_bars.pdf}
+    \caption{Risk-adjusted performance ratios}
+    \label{fig:bars}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{max_drawdown.pdf}
+    \caption{Maximum drawdown comparison}
+    \label{fig:drawdown}
+\end{subfigure}
+\caption{Performance comparison across all three strategies. The regime-adaptive approach achieves superior risk-adjusted returns (a) with a maximum drawdown 53\% smaller than SPY (b).}
+\label{fig:performance_comparison}
+\end{figure}
+
+\subsection{Rolling Performance Stability}
+
+Figure~\ref{fig:rolling} shows the 252-day rolling Sharpe ratio for both the regime-adaptive strategy and SPY. The strategy maintains a consistently higher rolling Sharpe, with particularly large outperformance during and immediately after stress periods (2009--2010, 2020, 2022). The rolling Sharpe rarely drops below zero for the adaptive strategy, whereas SPY experiences extended negative-Sharpe periods during drawdowns.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{rolling_sharpe.pdf}
+\caption{252-day rolling Sharpe ratio. The regime-adaptive strategy maintains consistently higher risk-adjusted returns, with the largest outperformance occurring during and after stress periods.}
+\label{fig:rolling}
+\end{figure}
+
+\subsection{Annual Return Decomposition}
+
+Figure~\ref{fig:annual} shows the year-by-year return comparison. The strategy captures most of SPY's upside in bull years while significantly outperforming in drawdown years (2020, 2022). This asymmetric profile---participating in gains, avoiding losses---is the hallmark of an effective regime-responsive system.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{annual_returns.pdf}
+\caption{Annual return comparison. The strategy participates in bull markets while significantly outperforming during drawdown years (2020, 2022), demonstrating the value of regime-responsive cash allocation.}
+\label{fig:annual}
+\end{figure}
+
+\subsection{Multi-Scale Detector Response}
+
+Figure~\ref{fig:detector_covid} illustrates the coordinated detector
+response during the COVID-19 crash.  The CUSUM detector fires first
+(signal $\approx 0.55$ on the initial $-3.4\%$ day on February 24),
+providing rapid detection within a single trading day.  The EWMA
+crossover follows as the volatility regime shifts over the subsequent
+week.  The recursive Markov filter reaches 0.98 stress probability
+within 5 trading days.  The structural break detector provides
+confirmatory long-horizon evidence over the following weeks.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{detector_covid.pdf}
+\caption{Multi-scale detector response during the COVID-19 crash (January--June 2020). Top panel: SPY price. Lower panels: individual detector signals. The CUSUM fires within one day, followed by EWMA (days), Markov (weeks), and structural break (months)---each contributing at its native time-scale.}
+\label{fig:detector_covid}
+\end{figure}
+
+\subsection{Detector Contribution Analysis}
+
+The Brier-score-optimized weights with minimum floor reveal the
+relative importance of each time-scale (Figure~\ref{fig:membership}).
+CUSUM receives the dominant weight ($\sim$78\%), reflecting the value
+of rapid detection in the z-score formulation.  The structural break
+detector contributes $\sim$12\%, capturing long-horizon regime changes.
+EWMA and Markov-switching each contribute at or near the 5\% floor.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{membership_weights.pdf}
+\caption{Left: calibrated sigmoid membership functions showing each detector's activation profile. Right: Brier-score-optimized detector weights with 5\% minimum floor (dashed line). CUSUM dominates at $\sim$78\%, consistent with the value of rapid z-score-based detection.}
+\label{fig:membership}
+\end{figure}
+
+\subsection{Cash Allocation Dynamics}
+
+The implicit cash mechanism is the primary driver of drawdown
+reduction.  Figure~\ref{fig:stress_cash} shows the composite stress
+probability alongside the portfolio's cash allocation over the full
+backtest period.  Stress spikes trigger proportional cash increases,
+with the most dramatic response during COVID-19 and the 2022 rate-hiking
+drawdown.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{stress_cash.pdf}
+\caption{Composite stress probability (top) and portfolio cash allocation (bottom) over the full out-of-sample period. Stress spikes produce proportional increases in cash, with the largest allocations during COVID-19 (2020) and the rate-hiking cycle (2022). The dashed line marks the 0.7 threshold above which Core basket scaling activates.}
+\label{fig:stress_cash}
+\end{figure}
+
+Figure~\ref{fig:covid_zoom} provides a detailed view of the COVID-19
+period.  The portfolio's equity exposure dropped to 21.1\% (78.9\%
+implicit cash) within approximately one week of the drawdown onset.
+Recovery re-entry occurred gradually through April--May 2020 as
+$P(\text{stress})$ declined, consistent with the Ornstein-Uhlenbeck
+half-life estimates for the fastest-recovering sectors.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{covid_zoom.pdf}
+\caption{COVID-19 case study (February--July 2020). Top: relative performance of the strategy vs.\ SPY. Bottom: portfolio equity and cash weights. The strategy moved to $\sim$79\% cash within days of the crash onset and gradually re-entered during recovery.}
+\label{fig:covid_zoom}
+\end{figure}
+
+\subsection{Basket Classification}
+
+Figure~\ref{fig:scatter} shows the sector ETF classification landscape at a representative rebalance date. The tercile-based classification produces a typical distribution of 3--4 assets in Basket~A (Tactical), 1--3 in Basket~B (Avoid), and 4--6 in Basket~C (Core), providing 5--7 actively managed positions at each rebalance. Energy (XLE) and Financials (XLF) frequently appear in the higher-volatility baskets, consistent with their conditional risk profiles.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{basket_scatter.pdf}
+\caption{Sector ETF basket classification based on GARCH conditional volatility (y-axis) and OU recovery half-life (x-axis). Tercile boundaries on volatility and median half-life determine basket assignment. Higher-volatility sectors with fast recovery (Tactical) are actively traded; those with slow recovery (Avoid) are continuously de-risked.}
+\label{fig:scatter}
+\end{figure}
+
+% ─── DISCUSSION ──────────────────────────────────────────────────────────────
+\section{Discussion}
+
+\subsection{The Normalization Problem}
+
+A critical design insight is that portfolio weight normalization can
+negate regime-responsive behavior.  Inverse-volatility weights for $N$
+assets produce raw sums of $\sim$20--30.  When stressed assets are
+de-weighted and the result is normalized to sum to 1.0, the freed
+capacity is redistributed proportionally to surviving positions---including
+Core assets.  This means the portfolio \emph{increases} its allocation
+to these assets during stress, the opposite of risk reduction.  Our
+approach normalizes base weights to 1.0 \emph{before} stress scaling,
+so that post-scaling sums below 1.0 represent genuine cash allocation.
+
+\subsection{Detector Scale Invariance}
+
+The z-score standardization of CUSUM inputs is critical for practical
+deployment.  With raw returns, the Siegmund threshold scales inversely
+with the standard deviation ($h \propto 1/\sigma$), producing
+thresholds of $\sim$558 for typical equity returns ($\sigma \approx 0.012$).
+Daily accumulator increments of $\sim$0.04 require thousands of
+consecutive crash days to trigger.  In z-score space, the threshold is
+$\sim$6.70 regardless of return scale, and a single $-5\%$ day produces
+a meaningful signal of 0.55.
+
+\subsection{Limitations}
+
+The framework has several limitations.  First, the annualized turnover
+of 4.01$\times$ creates transaction cost drag, though the 10~bps assumption
+is conservative for liquid ETFs.  Second, the quarterly recalibration frequency
+may lag rapidly evolving dynamics; event-driven recalibration could improve
+responsiveness.  Third, the CUSUM detector's $\sim$78\% weight dominance
+suggests the remaining detectors contribute primarily through ensemble
+diversity.  Fourth, the backtest spans a single macroeconomic epoch
+(post-GFC monetary expansion); performance in structurally different
+interest rate environments requires further validation.
+
+\subsection{Robustness}
+
+All parameters are re-estimated at each walk-forward step using only
+past data.  The bounded L-BFGS-B optimization with minimum weight
+floors prevents convergence to degenerate single-detector solutions.
+The implicit cash mechanism provides a natural risk-reduction pathway
+that does not depend on predicting the \emph{type} of stress, only its
+\emph{presence}.
+
+% ─── CONCLUSION ──────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+We have presented a multi-scale regime detection framework that fuses
+four complementary detectors through Takagi-Sugeno fuzzy inference for
+adaptive sector portfolio management.  The walk-forward validated
+results demonstrate a Sharpe ratio of 0.78 with a maximum drawdown of
+$-$19.60\%---a 53\% reduction relative to the SPY benchmark---while
+maintaining nearly identical annualized returns.
+
+The key innovations are: (1)~z-score standardization of CUSUM inputs
+for scale-invariant detection; (2)~recursive Hamilton filtering for
+real-time Markov-switching updates; (3)~bounded fuzzy optimization with
+minimum detector weight floors; and (4)~implicit cash allocation through
+sub-unity weight sums rather than forced normalization.
+
+The framework's success lies not in predicting market direction but in
+reliably detecting the \emph{onset} of stress and responding with
+genuine risk reduction.  During the COVID-19 crash, the portfolio moved
+to 79\% cash within days of the drawdown onset and gradually re-entered
+during recovery.  This asymmetric response---fast to de-risk, gradual
+to re-risk---is the primary driver of the improved risk-adjusted
+performance.
+
+Future work may explore: (1)~event-driven recalibration triggered by
+detector alerts; (2)~cross-sectional regime signals from equity factor
+models; (3)~extension to multi-asset-class allocation; and
+(4)~incorporation of options-based tail hedging as a complement to the
+implicit cash mechanism.
+
+% ─── REFERENCES ──────────────────────────────────────────────────────────────
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{20}
+
+\bibitem[Ang and Bekaert(2002)]{ang2002}
+A.~Ang and G.~Bekaert.
+\newblock International asset allocation with regime shifts.
+\newblock \emph{Review of Financial Studies}, 15(4):1137--1187, 2002.
+
+\bibitem[Bollerslev(1986)]{bollerslev1986}
+T.~Bollerslev.
+\newblock Generalized autoregressive conditional heteroskedasticity.
+\newblock \emph{Journal of Econometrics}, 31(3):307--327, 1986.
+
+\bibitem[Brier(1950)]{brier1950}
+G.~W. Brier.
+\newblock Verification of forecasts expressed in terms of probability.
+\newblock \emph{Monthly Weather Review}, 78(1):1--3, 1950.
+
+\bibitem[Engle(1982)]{engle1982}
+R.~F. Engle.
+\newblock Autoregressive conditional heteroscedasticity with estimates
+  of the variance of {United Kingdom} inflation.
+\newblock \emph{Econometrica}, 50(4):987--1007, 1982.
+
+\bibitem[Fama and French(2015)]{fama2015}
+E.~F. Fama and K.~R. French.
+\newblock A five-factor model of expected stock returns.
+\newblock \emph{Journal of Financial Economics}, 116(1):1--22, 2015.
+
+\bibitem[Gradojevic and Gen\c{c}ay(2013)]{gradojevic2013}
+N.~Gradojevic and R.~Gen\c{c}ay.
+\newblock Fuzzy logic, trading uncertainty, and technical trading.
+\newblock \emph{Journal of Banking \& Finance}, 37(2):578--586, 2013.
+
+\bibitem[Hamilton(1989)]{hamilton1989}
+J.~D. Hamilton.
+\newblock A new approach to the economic analysis of nonstationary time
+  series and the business cycle.
+\newblock \emph{Econometrica}, 57(2):357--384, 1989.
+
+\bibitem[Killick et~al.(2012)]{killick2012}
+R.~Killick, P.~Fearnhead, and I.~A. Eckley.
+\newblock Optimal detection of changepoints with a linear computational
+  cost.
+\newblock \emph{Journal of the American Statistical Association},
+  107(500):1590--1598, 2012.
+
+\bibitem[Kirby and Ostdiek(2012)]{kirby2012}
+C.~Kirby and B.~Ostdiek.
+\newblock It's all in the timing: Simple active portfolio strategies
+  that outperform na\"ive diversification.
+\newblock \emph{Journal of Financial and Quantitative Analysis},
+  47(2):437--467, 2012.
+
+\bibitem[Longerstaey and Spencer(1996)]{longerstaey1996}
+J.~Longerstaey and M.~Spencer.
+\newblock \emph{RiskMetrics Technical Document}.
+\newblock J.P.~Morgan/Reuters, 1996.
+
+\bibitem[Nystrup et~al.(2017)]{nystrup2017}
+P.~Nystrup, B.~W. Hansen, H.~Madsen, and E.~Lindstr\"{o}m.
+\newblock Regime-based versus static asset allocation: Letting the data
+  speak.
+\newblock \emph{Journal of Risk}, 19(6), 2017.
+
+\bibitem[Page(1954)]{page1954}
+E.~S. Page.
+\newblock Continuous inspection schemes.
+\newblock \emph{Biometrika}, 41(1/2):100--115, 1954.
+
+\bibitem[Siegmund(1985)]{siegmund1985}
+D.~Siegmund.
+\newblock \emph{Sequential Analysis: Tests and Confidence Intervals}.
+\newblock Springer, 1985.
+
+\bibitem[Takagi and Sugeno(1985)]{takagi1985}
+T.~Takagi and M.~Sugeno.
+\newblock Fuzzy identification of systems and its applications to
+  modeling and control.
+\newblock \emph{IEEE Transactions on Systems, Man, and Cybernetics},
+  (1):116--132, 1985.
+
+\bibitem[Uhlenbeck and Ornstein(1930)]{uhlenbeck1930}
+G.~E. Uhlenbeck and L.~S. Ornstein.
+\newblock On the theory of the {Brownian} motion.
+\newblock \emph{Physical Review}, 36(5):823, 1930.
+
+\end{thebibliography}
+
+\end{document}
