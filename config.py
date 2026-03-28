@@ -54,3 +54,18 @@ LAMBDA_TURNOVER: float = 0.1          # Turnover penalty coefficient
 COLD_START_WINDOWS: int = 2           # Walk-forward windows before policy is trusted
 N_POLICY_HEADS: int = 3               # For multi-head policy (Phase 3)
 USE_MULTI_HEAD: bool = True           # Toggle multi-head vs single-head
+
+# ── Strategy V2 Parameters ───────────────────────────────────────────────────
+ORACLE_LOOKBACK: int = 21             # Days of hindsight for oracle
+ORACLE_RISK_AVERSION: float = 2.0     # Risk aversion in oracle QP
+IMITATION_LR: float = 1e-3
+IMITATION_EPOCHS: int = 30
+POLICY_STATE_DIM: int = 99
+POLICY_HIDDEN_DIM: int = 128
+POLICY_N_LAYERS: int = 2
+POLICY_N_HEADS: int = 3               # Multi-head regime gating
+DIVERGENCE_LOOKBACK: int = 42
+DIVERGENCE_THRESHOLD: float = -1.5
+PUT_ENABLED: bool = True              # Toggle put overlay
+CASH_ENABLED: bool = True             # Toggle cash management
+TRADE_LEDGER_ENABLED: bool = True

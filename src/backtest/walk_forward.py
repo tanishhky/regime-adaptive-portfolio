@@ -66,24 +66,15 @@ class WalkForwardEngine:
 
         # Aggregator and portfolio manager (mode-dependent)
         if use_neural:
-            from src.detectors.attention_fusion import AttentionFusion
-            from src.portfolio.neural_manager import NeuralPortfolioManager
-            from src.neural.thompson_sampler import ThompsonSampler
-
-            self.attention = AttentionFusion()
-            self.neural_mgr = NeuralPortfolioManager(
-                list(config.SECTOR_ETFS.keys()),
-            )
-            self.thompson = ThompsonSampler()
+            from src.strategy.engine import StrategyEngine
+            self.strategy_engine = StrategyEngine(list(config.SECTOR_ETFS.keys()))
+            
             # Keep references for backward compat in results
             self.fuzzy = None
             self.basket_mgr = None
         else:
             self.fuzzy = FuzzyAggregator()
             self.basket_mgr = BasketManager()
-            self.attention = None
-            self.neural_mgr = None
-            self.thompson = None
 
         # Results storage
         self.portfolio_returns: list[float] = []
@@ -248,13 +239,7 @@ class WalkForwardEngine:
 
                 # Calibrate aggregator
                 if self.use_neural:
-                    context_matrix = self._build_context_matrix(
-                        train_spy, train_sector, vix_prices, common_idx,
-                    )
-                    self.attention.calibrate(
-                        signal_matrix, context_matrix,
-                        train_spy_aligned,
-                    )
+                    pass # Handled by strategy engine later
                 else:
                     self.fuzzy.calibrate(signal_matrix, train_spy_aligned)
 
@@ -292,23 +277,14 @@ class WalkForwardEngine:
             rf_mean = float(rf_series.iloc[:wp_start].mean())
 
             if self.use_neural:
-                # Thompson sample hyperparameters
-                hp = self.thompson.sample()
-                self.neural_mgr.trainer.lambda_dd = hp["lambda_dd"]
-                self.neural_mgr.trainer.lambda_turnover = hp["lambda_turnover"]
-                self.neural_mgr.trainer.entropy_coef = hp["entropy_coef"]
-
-                # Build context matrix for neural calibration
-                context_matrix = self._build_context_matrix(
-                    train_spy, train_sector, vix_prices, common_idx,
+                vix_aligned = vix_prices.reindex(common_idx).fillna(20.0) if vix_prices is not None else pd.Series(20.0, index=common_idx)
+                self.strategy_engine.calibrate(
+                    train_ret=train_sector, assignments=assignments,
+                    vol_dict=vol_dict, signal_matrix=signal_matrix,
+                    spy_ret=train_spy, vix_prices=vix_aligned,
+                    rf_daily=rf_mean, log_ret_full=log_ret,
+                    train_end_idx=wp_start,
                 )
-
-                self.neural_mgr.calibrate(
-                    train_sector, assignments, vol_dict,
-                    signal_matrix, context_matrix,
-                    train_spy, vix_prices, rf_mean,
-                )
-                self.neural_mgr.reset()
             else:
                 p_stress_train = pd.Series(
                     self.fuzzy.aggregate_series(signal_matrix),
@@ -352,42 +328,29 @@ class WalkForwardEngine:
 
                 # Aggregate signals
                 if self.use_neural:
-                    # Build rolling history for attention
-                    sig_row = np.array([sig_cusum, sig_ewma, sig_markov, sig_struct])
-                    signal_history.append(sig_row)
-
-                    # Context for this day
-                    spy_5d_vol = 0.0
-                    spy_21d_vol = 0.0
-                    if day_idx >= 5:
-                        spy_5d_vol = float(spy_ret.iloc[day_idx - 4: day_idx + 1].std() * np.sqrt(252))
-                    if day_idx >= 21:
-                        spy_21d_vol = float(spy_ret.iloc[day_idx - 20: day_idx + 1].std() * np.sqrt(252))
-                    vix_val = 0.0
-                    if vix_prices is not None and day_idx < len(vix_prices):
-                        v = vix_prices.iloc[day_idx]
-                        vix_val = v if not np.isnan(v) else 0.0
-                    day_rets = []
-                    for tkr in available:
-                        r = float(sector_ret[tkr].iloc[day_idx])
-                        if not np.isnan(r):
-                            day_rets.append(r)
-                    sector_disp = float(np.std(day_rets)) if len(day_rets) > 1 else 0.0
-
-                    ctx_row = np.array([spy_r, spy_5d_vol, spy_21d_vol, vix_val, sector_disp])
-                    context_history.append(ctx_row)
-
-                    # Use attention fusion
-                    lookback = config.ATTENTION_LOOKBACK
-                    sig_hist = np.array(signal_history[-lookback:])
-                    ctx_hist = np.array(context_history[-lookback:])
-                    p_stress = self.attention.aggregate(sig_hist, ctx_hist)
-
-                    # Neural portfolio weights
-                    new_weights = self.neural_mgr.compute_weights(
-                        day_idx, log_ret, current_weights,
-                        assignments, vol_dict, p_stress,
-                        detector_sigs, spy_ret, vix_prices,
+                    # Gating network regime probabilities
+                    regime_probs = np.array([0.33, 0.33, 0.34])
+                    if getattr(self.strategy_engine, '_is_trained', False) and self.strategy_engine.policy is not None:
+                        gw = self.strategy_engine.policy.last_gate_weights
+                        if gw is not None:
+                            regime_probs = gw[0, 0].cpu().numpy()
+                    
+                    self.gate_weights_history.append(regime_probs)
+                    
+                    # Markov signal is a solid proxy for p_stress
+                    p_stress = sig_markov
+                    
+                    # Neural strategy allocation
+                    new_weights = self.strategy_engine.compute_allocation(
+                        day_idx=day_idx, date=day, log_ret=log_ret, prices=prices,
+                        regime_probs=regime_probs, p_stress=p_stress,
+                        detector_signals=detector_sigs,
+                        assignments=assignments, vol_dict=vol_dict,
+                        spy_price=float(prices[config.BENCHMARK].iloc[day_idx]),
+                        vix=float(vix_prices.iloc[day_idx]) if (vix_prices is not None and not np.isnan(vix_prices.iloc[day_idx])) else 20.0,
+                        rf_daily=float(rf_series.iloc[day_idx]),
+                        spy_ret=spy_ret, vix_prices=vix_prices,
+                        days_since_rebalance=(day_idx - wp_start)
                     )
                 else:
                     # Original fuzzy + basket manager path
@@ -414,16 +377,8 @@ class WalkForwardEngine:
 
                 # Record outcome for neural manager
                 if self.use_neural:
-                    turnover = (
-                        self.execution.log.daily_turnover[-1]
-                        if self.execution.log.daily_turnover
-                        else 0.0
-                    )
-                    is_last_day = (day_idx == wp_end - 1) or (day_idx == n_days - 1)
-                    self.neural_mgr.record_outcome(
-                        day_ret, turnover, done=is_last_day,
-                    )
-                    window_returns.append(day_ret)
+                    turnover = sum(abs(new_weights.get(t, 0) - current_weights.get(t, 0)) for t in available)
+                    self.strategy_engine.record_daily_return(day_ret, float(rf_series.iloc[day_idx]))
 
                 # Record
                 self.portfolio_returns.append(day_ret)
@@ -438,13 +393,9 @@ class WalkForwardEngine:
                 )
                 current_weights = new_weights
 
-            # Thompson update after each test window
+            # Cleanup post-test window
             if self.use_neural and window_returns:
-                window_sharpe = 0.0
-                arr = np.array(window_returns)
-                if arr.std() > 1e-8:
-                    window_sharpe = arr.mean() / arr.std() * np.sqrt(252)
-                self.thompson.update(hp, window_sharpe > 0)
+                pass
 
         # Compile results
         port_ret = pd.Series(
@@ -487,16 +438,10 @@ class WalkForwardEngine:
         }
 
         if self.use_neural:
-            results["gate_weights_history"] = (
-                self.neural_mgr.gate_weights_history
-                if self.neural_mgr
-                else []
-            )
-            results["thompson_posteriors"] = (
-                self.thompson.get_posterior_means()
-                if self.thompson
-                else {}
-            )
+            results['trade_ledger'] = self.strategy_engine.ledger.to_dataframe()
+            results['put_positions'] = self.strategy_engine.put_mgr.state.positions
+            results['regime_probs_history'] = self.gate_weights_history
+            results['cash_weight_history'] = self.strategy_engine.cash_mgr.cash_pnl_history
         else:
             results["entry_threshold"] = self.basket_mgr.entry_threshold
             results["exit_threshold"] = self.basket_mgr.exit_threshold
