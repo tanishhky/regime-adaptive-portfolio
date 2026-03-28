@@ -100,6 +100,30 @@ python -m pytest tests/ -v
 
 **Walk-Forward Validation**: All parameters are re-estimated at each quarterly step using only past data. No hardcoded thresholds. Zero lookahead bias.
 
+## Neural Enhancement (v2)
+
+The project includes an optional neural-network layer that replaces the rule-based allocation with learned policies:
+
+**Attention-Based Detector Fusion** (`src/detectors/attention_fusion.py`): A 2-layer TransformerEncoder with causal masking replaces the Takagi-Sugeno fuzzy aggregator. It learns which detectors to trust in different market contexts using a 63-day lookback window of detector signals plus 5 context features (SPY return, rolling vols, VIX, sector dispersion). Trained via BCE against realized drawdowns with early stopping.
+
+**LSTM-PPO Policy Network** (`src/neural/policy_network.py`): A 2-layer LSTM with PPO training replaces the rigid basket rules. The policy observes a 99-dimensional state vector (88 per-asset features + 7 market features + 4 portfolio features) and outputs portfolio weights via softmax (long-only, sum to 1). Features include GARCH vols, basket assignments (as inputs, not rules), trailing returns, and composite stress probability.
+
+**Multi-Head Regime Gating** (`src/neural/policy_network.py::MultiHeadPolicy`): Three parallel policy heads (Bull/Transition/Crisis) are mixed by a learned gating network. The gate weights are interpretable — they reveal what regime the model thinks it's in.
+
+**Thompson Sampling** (`src/neural/thompson_sampler.py`): Bayesian hyperparameter selection replaces grid search. Maintains Beta posteriors over drawdown penalty, turnover penalty, and entropy coefficient. Updated after each walk-forward window based on observed Sharpe.
+
+**Experience Replay** (`src/neural/replay_buffer.py`): Exponential recency weighting (β=0.5) ensures the policy adapts to evolving regimes while retaining memory of rare events.
+
+### Running the Neural Pipeline
+
+```bash
+# Neural-only backtest
+python run_neural_pipeline.py
+
+# Side-by-side comparison (original vs neural)
+python run_comparison.py
+```
+
 ## Citation
 
 ```bibtex

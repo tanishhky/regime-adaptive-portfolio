@@ -9,3 +9,4 @@ yfinance>=0.2.31
 matplotlib>=3.7
 seaborn>=0.12
 ruptures>=1.1
+torch>=2.0
