@@ -1,0 +1,5 @@
+,Ann. Return,Ann. Vol,Sharpe,Sortino,Calmar,Max DD,Max DD Duration,Ann. Turnover,Regime Transitions,Hit Rate,False Alarm
+Original (Fuzzy+Basket),9.09%,16.15%,0.48,0.45,0.21,-43.65%,535d,3.93,122,91.6%,8.4%
+Neural (Attention+PPO),6.91%,10.29%,0.55,0.51,0.24,-29.25%,386d,7.66,78,67.7%,32.3%
+SPY (Buy & Hold),11.79%,17.98%,0.58,0.54,0.28,-41.71%,512d,0.00,0,0.0%,0.0%
+Equal-Weight Sector,8.52%,16.05%,0.45,0.42,0.18,-46.40%,530d,0.00,0,0.0%,0.0%

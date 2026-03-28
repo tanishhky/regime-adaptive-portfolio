@@ -4,6 +4,6 @@ __pycache__/
 data/raw/
 *.log
 .DS_Store
-output/
+# output/
 !output/.gitkeep
 .claude/

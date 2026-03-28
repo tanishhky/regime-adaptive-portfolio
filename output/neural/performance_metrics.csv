@@ -1,0 +1,4 @@
+,Ann. Return,Ann. Vol,Sharpe,Sortino,Calmar,Max DD,Max DD Duration,Ann. Turnover,Regime Transitions,Hit Rate,False Alarm
+Neural Policy,8.29%,15.64%,0.45,0.41,0.18,-46.03%,530d,0.51,14,98.1%,1.9%
+SPY (Buy & Hold),11.79%,17.98%,0.58,0.54,0.28,-41.71%,512d,0.00,0,0.0%,0.0%
+Equal-Weight Sector,8.52%,16.05%,0.45,0.42,0.18,-46.40%,530d,0.00,0,0.0%,0.0%
