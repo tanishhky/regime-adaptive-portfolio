@@ -1,0 +1,270 @@
+============================================================
+Regime-Adaptive Portfolio — Robustness Analysis
+============================================================
+[0/6] Loading data...
+  Loaded cached data: 4779 days × 13 tickers.
+
+============================================================
+PHASE 1: ABLATION STUDY
+============================================================
+    Running ablation: full_ensemble (active: cusum, ewma, markov, structural)...
+    Running ablation: cusum_only (active: cusum)...
+    Running ablation: ewma_only (active: ewma)...
+    Running ablation: markov_only (active: markov)...
+    Running ablation: structural_only (active: structural)...
+    Running ablation: no_cusum (active: ewma, markov, structural)...
+    Running ablation: no_ewma (active: cusum, markov, structural)...
+    Running ablation: no_markov (active: cusum, ewma, structural)...
+    Running ablation: no_structural (active: cusum, ewma, markov)...
+    Running ablation: cusum_ewma (active: cusum, ewma)...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/ablation_results.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/ablation_equity_curves.png
+
+         config  ann_return  ann_vol   sharpe  sortino   calmar    max_dd  max_dd_duration  turnover
+  full_ensemble    0.120281 0.137974 0.777963 0.744436 0.625519 -0.192290              218  3.883638
+     cusum_only    0.130355 0.131635 0.891964 0.860399 0.822954 -0.158399              262  6.191300
+      ewma_only    0.071246 0.097433 0.598399 0.590635 0.239806 -0.297099              970 10.236225
+    markov_only    0.082582 0.117519 0.592583 0.554332 0.323046 -0.255635              435  3.818392
+structural_only    0.024685 0.096274 0.121975 0.123789 0.083194 -0.296717              894  1.306765
+       no_cusum    0.090230 0.160341 0.482023 0.448252 0.217274 -0.415283              521  1.245850
+        no_ewma    0.124573 0.135230 0.825489 0.793269 0.834010 -0.149366              208  4.720803
+      no_markov    0.121491 0.137165 0.791374 0.758422 0.606257 -0.200395              225  4.180886
+  no_structural    0.122967 0.134291 0.819300 0.786052 0.673960 -0.182454              180  4.995026
+     cusum_ewma    0.129716 0.133181 0.876801 0.844933 0.797761 -0.162600              180  5.466589
+
+  Phase 1 completed in 5772s
+
+============================================================
+PHASE 2: BASELINE COMPARISONS
+============================================================
+    Running regime-adaptive strategy...
+    Running vol targeting...
+    Running MA timing...
+    Running risk parity...
+    Running drawdown control...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/baseline_comparison.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/baseline_equity_curves.png
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/baseline_metrics_bars.png
+
+        strategy  ann_return  ann_vol   sharpe  sortino   calmar    max_dd  max_dd_duration  turnover
+ Regime-Adaptive    0.120281 0.137974 0.777963 0.744436 0.625519 -0.192290              218  3.883638
+   Vol Targeting    0.071753 0.121683 0.483315 0.444630 0.327561 -0.219053              521  0.000000
+MA Timing (200d)    0.156438 0.113950 1.259297 1.289450 1.463127 -0.106920              169  0.000000
+     Risk Parity    0.078593 0.143775 0.456624 0.423862 0.197200 -0.398545              534  0.000000
+Drawdown Control    0.157837 0.115069 1.259202 1.251605 1.871099 -0.084355              157  0.000000
+SPY (Buy & Hold)    0.117933 0.179785 0.583981 0.543948 0.282742 -0.417104              512  0.000000
+
+  Phase 2 completed in 611s
+
+============================================================
+PHASE 3: SENSITIVITY ANALYSIS
+============================================================
+
+  [3a] Transaction cost sensitivity...
+    Cost sensitivity: 0 bps...
+    Cost sensitivity: 5 bps...
+    Cost sensitivity: 10 bps...
+    Cost sensitivity: 15 bps...
+    Cost sensitivity: 20 bps...
+    Cost sensitivity: 30 bps...
+    Cost sensitivity: 50 bps...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/cost_sensitivity.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/cost_sensitivity.png
+
+ cost_bps  ann_return  ann_vol   sharpe  sortino    max_dd
+        0    0.124164 0.137943 0.806293 0.773218 -0.188630
+        5    0.122223 0.137958 0.792131 0.758911 -0.190229
+       10    0.120281 0.137974 0.777963 0.744436 -0.192290
+       15    0.118339 0.137992 0.763790 0.729990 -0.194354
+       20    0.116397 0.138012 0.749612 0.715758 -0.196418
+       30    0.112514 0.138055 0.721243 0.687538 -0.200546
+       50    0.104746 0.138162 0.664469 0.630706 -0.208802
+
+  [3b] Walk-forward window sensitivity...
+    Window sensitivity: train=252,step=63...
+    Window sensitivity: train=504,step=63...
+    Window sensitivity: train=756,step=63...
+    Window sensitivity: train=504,step=21...
+    Window sensitivity: train=504,step=126...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/window_sensitivity.csv
+
+ train_window  oos_step  ann_return  ann_vol   sharpe  sortino   calmar    max_dd  turnover
+          252        63    0.106940 0.139725 0.670442 0.643036 0.313279 -0.341358  4.889791
+          504        63    0.120281 0.137974 0.777963 0.744436 0.625519 -0.192290  3.883638
+          756        63    0.117307 0.133306 0.776812 0.747225 0.709390 -0.165363  3.487956
+          504        21    0.115857 0.138130 0.745065 0.708659 0.619049 -0.187154  4.971126
+          504       126    0.116428 0.137715 0.751452 0.718036 0.605484 -0.192290  3.456312
+
+  [3c] Stress threshold sensitivity...
+    Threshold sensitivity: 0.5...
+    Threshold sensitivity: 0.6...
+    Threshold sensitivity: 0.7...
+    Threshold sensitivity: 0.8...
+    Threshold sensitivity: 0.9...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/threshold_sensitivity.csv
+
+ basket_c_threshold  ann_return  ann_vol   sharpe  sortino   calmar    max_dd  turnover
+                0.5    0.124606 0.134526 0.830051 0.797691 0.795333 -0.156671  4.786939
+                0.6    0.122786 0.135979 0.807798 0.774784 0.742532 -0.165361  4.298075
+                0.7    0.120281 0.137974 0.777963 0.744436 0.625519 -0.192290  3.883638
+                0.8    0.118168 0.140979 0.746397 0.713247 0.519995 -0.227248  3.483316
+                0.9    0.112379 0.145078 0.685399 0.650534 0.448163 -0.250754  3.137854
+
+  [3d] Regime-conditional costs (VIX-scaled)...
+    Regime costs: flat_10bps...
+    Regime costs: vix_scaled...
+    Regime costs: vix_scaled_conservative...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/regime_costs.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/regime_costs_timeseries.png
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/regime_costs_comparison.png
+
+             cost_model  base_bps  ann_return  ann_vol   sharpe  sortino   calmar    max_dd  turnover
+             flat_10bps        10    0.120281 0.137974 0.777963 0.744436 0.625519 -0.192290  3.883638
+             vix_scaled        10    0.118113 0.138035 0.761913 0.728052 0.598105 -0.197478  3.883638
+vix_scaled_conservative        15    0.115087 0.138088 0.739707 0.705572 0.569352 -0.202136  3.883638
+
+  Phase 3 completed in 10297s
+
+============================================================
+PHASE 4: CROSS-ASSET VALIDATION
+============================================================
+
+    [Multi-Asset] Downloading data...
+      Downloading: SPY, TLT, IEF, GLD, DBC, VNQ, EFA, EEM, ^VIX...
+[                       0%                       ][***********           22%                       ]  2 of 9 completed[****************      33%                       ]  3 of 9 completed[********************* 44%                       ]  4 of 9 completed[**********************56%**                     ]  5 of 9 completed[**********************67%*******                ]  6 of 9 completed[**********************78%************           ]  7 of 9 completed[**********************89%******************     ]  8 of 9 completed[*********************100%***********************]  9 of 9 completed
+    [Multi-Asset] Available: SPY, TLT, IEF, GLD, DBC, VNQ, EFA, EEM
+    [Multi-Asset] Date range: 2007-01-03 to 2025-12-30
+    [Multi-Asset] Running walk-forward (min_train=504)...
+    [Multi-Asset] Strategy Sharpe: 0.28, EW Sharpe: 0.26, SPY Sharpe: 0.58
+
+    [International] Downloading data...
+      Downloading: EFA, EEM, EWJ, EWG, EWU, FXI, EWZ, EWY, SPY, ^VIX...
+[                       0%                       ][                       0%                       ][**************        30%                       ]  3 of 10 completed[*******************   40%                       ]  4 of 10 completed[**********************50%                       ]  5 of 10 completed[**********************60%****                   ]  6 of 10 completed[**********************70%*********              ]  7 of 10 completed[**********************80%*************          ]  8 of 10 completed[**********************90%******************     ]  9 of 10 completed[*********************100%***********************]  10 of 10 completed
+    [International] Available: EFA, EEM, EWJ, EWG, EWU, FXI, EWZ, EWY
+    [International] Date range: 2007-01-03 to 2025-12-30
+    [International] Running walk-forward (min_train=504)...
+    [International] Strategy Sharpe: 0.22, EW Sharpe: 0.11, SPY Sharpe: 0.58
+
+    [Factor] Downloading data...
+      Downloading: MTUM, VLUE, QUAL, SIZE, USMV, SPY, ^VIX...
+[                       0%                       ][**************        29%                       ]  2 of 7 completed[********************* 43%                       ]  3 of 7 completed[**********************57%**                     ]  4 of 7 completed[**********************71%*********              ]  5 of 7 completed[**********************86%****************       ]  6 of 7 completed[*********************100%***********************]  7 of 7 completed
+    [Factor] Available: MTUM, VLUE, QUAL, SIZE, USMV
+    [Factor] Date range: 2007-01-03 to 2025-12-30
+    [Factor] Running walk-forward (min_train=252)...
+    [Factor] Strategy Sharpe: 0.79, EW Sharpe: 0.51, SPY Sharpe: 0.37
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/cross_asset_results.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/cross_asset_equity_curves.png
+
+     universe  strategy_sharpe  strategy_return  strategy_vol  strategy_max_dd  strategy_calmar  strategy_turnover  ew_sharpe  ew_return  ew_max_dd  benchmark_sharpe
+  Multi-Asset         0.281665         0.033845      0.074213        -0.229079         0.147745           3.869665   0.259563   0.041989  -0.250678          0.583981
+International         0.215383         0.050061      0.172342        -0.449214         0.111442           4.299552   0.110808   0.036262  -0.583189          0.583981
+       Factor         0.792430         0.098709      0.107828        -0.190667         0.517704           2.819095   0.509431   0.084847  -0.444090          0.366768
+
+  Phase 4 completed in 1215s
+
+============================================================
+PHASE 5: REGIME GENERALIZATION
+============================================================
+
+  [5a] Sub-period analysis...
+    Running full walk-forward backtest...
+
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/period_analysis.csv
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/period_analysis.png
+
+                        period  strategy_return  strategy_vol  strategy_sharpe  strategy_max_dd  spy_return  spy_vol  spy_sharpe  spy_max_dd  sharpe_diff
+ 2009-2012 (post-GFC recovery)         0.116726      0.169719         0.611506        -0.192290    0.106954 0.207524    0.453016   -0.316516     0.158490
+      2013-2016 (low-vol bull)         0.112381      0.124077         0.801432        -0.145342    0.112709 0.129158    0.772440   -0.154916     0.028991
+        2017-2019 (late cycle)         0.124350      0.103431         1.077121        -0.129697    0.121846 0.129073    0.843741   -0.225377     0.233380
+2020-2022 (COVID + rate hikes)         0.137371      0.158935         0.782889        -0.147366    0.057476 0.251907    0.176789   -0.417104     0.606100
+          2023-2025 (recovery)         0.114352      0.114272         0.887446        -0.119853    0.196568 0.153155    1.198953   -0.210708    -0.311507
+
+  [5b] Detector weight stability...
+    Running weight-tracking backtest...
+    Tracked 68 rebalance windows
+    Mean weights: {'cusum': 0.7986321546001834, 'ewma': 0.05113930833203103, 'markov': 0.057035825600060715, 'structural': 0.09319271146772493}
+    Saved: /Users/tanishkyadav/Documents/Github/regime-adaptive-portfolio/output/robustness/weight_stability.png
+
+               cusum      ewma    markov  structural
+2009-01-05  0.755428  0.124975  0.050032    0.069565
+2009-04-06  0.676601  0.050028  0.050049    0.223322
+2009-07-07  0.848160  0.050051  0.050320    0.051469
+2009-10-05  0.849891  0.050036  0.050036    0.050036
+2010-01-05  0.849261  0.050036  0.050237    0.050466
+2010-04-07  0.849891  0.050036  0.050036    0.050036
+2010-07-07  0.849891  0.050036  0.050036    0.050036
+2010-10-05  0.849891  0.050036  0.050036    0.050036
+2011-01-04  0.849891  0.050036  0.050036    0.050036
+2011-04-05  0.849891  0.050036  0.050036    0.050036
+2011-07-06  0.849861  0.050036  0.050066    0.050036
+2011-10-04  0.849891  0.050036  0.050036    0.050036
+2012-01-04  0.849891  0.050036  0.050036    0.050036
+2012-04-04  0.849891  0.050036  0.050036    0.050036
+2012-07-05  0.849891  0.050036  0.050036    0.050036
+2012-10-03  0.849891  0.050036  0.050036    0.050036
+2013-01-07  0.849891  0.050036  0.050036    0.050036
+2013-04-09  0.849891  0.050036  0.050036    0.050036
+2013-07-09  0.849891  0.050036  0.050036    0.050036
+2013-10-07  0.849891  0.050036  0.050036    0.050036
+2014-01-07  0.849891  0.050036  0.050036    0.050036
+2014-04-08  0.849891  0.050036  0.050036    0.050036
+2014-07-09  0.849891  0.050036  0.050036    0.050036
+2014-10-07  0.849891  0.050036  0.050036    0.050036
+2015-01-07  0.849834  0.050036  0.050061    0.050069
+2015-04-09  0.849891  0.050036  0.050036    0.050036
+2015-07-09  0.849891  0.050036  0.050036    0.050036
+2015-10-07  0.849891  0.050036  0.050036    0.050036
+2016-01-07  0.849891  0.050036  0.050036    0.050036
+2016-04-08  0.849891  0.050036  0.050036    0.050036
+2016-07-08  0.849891  0.050036  0.050036    0.050036
+2016-10-06  0.849891  0.050036  0.050036    0.050036
+2017-01-06  0.849891  0.050036  0.050036    0.050036
+2017-04-07  0.849891  0.050036  0.050036    0.050036
+2017-07-10  0.849891  0.050036  0.050036    0.050036
+2017-10-06  0.849891  0.050036  0.050036    0.050036
+2018-01-08  0.849651  0.050036  0.050149    0.050163
+2018-04-10  0.849891  0.050036  0.050036    0.050036
+2018-07-10  0.849891  0.050036  0.050036    0.050036
+2018-10-08  0.849614  0.050036  0.050213    0.050137
+2019-01-09  0.849891  0.050036  0.050036    0.050036
+2019-04-10  0.849891  0.050036  0.050036    0.050036
+2019-07-11  0.849891  0.050036  0.050036    0.050036
+2019-10-09  0.849891  0.050036  0.050036    0.050036
+2020-01-09  0.849891  0.050036  0.050036    0.050036
+2020-04-09  0.699404  0.050029  0.050240    0.200327
+2020-07-10  0.682138  0.050029  0.050029    0.217805
+2020-10-08  0.683323  0.050047  0.050082    0.216548
+2021-01-08  0.689050  0.050029  0.050029    0.210892
+2021-04-12  0.624972  0.050026  0.050026    0.274975
+2021-07-12  0.626145  0.050026  0.273767    0.050061
+2021-10-08  0.674826  0.050028  0.050028    0.225117
+2022-01-07  0.680079  0.050042  0.050042    0.219837
+2022-04-08  0.699424  0.050029  0.050030    0.200517
+2022-07-12  0.678198  0.050029  0.050084    0.221690
+2022-10-10  0.702098  0.050030  0.197839    0.050034
+2023-01-10  0.707806  0.050030  0.050030    0.192133
+2023-04-12  0.708562  0.050150  0.050150    0.191137
+2023-07-13  0.707719  0.050030  0.050584    0.191667
+2023-10-11  0.695994  0.050035  0.054166    0.199805
+2024-01-11  0.751922  0.050032  0.147343    0.050704
+2024-04-12  0.749468  0.050035  0.051052    0.149445
+2024-07-15  0.750045  0.050032  0.050032    0.149891
+2024-10-11  0.741860  0.050031  0.050044    0.158064
+2025-01-14  0.742646  0.050031  0.050031    0.157291
+2025-04-15  0.771360  0.050033  0.050227    0.128380
+2025-07-17  0.783859  0.050033  0.050033    0.116075
+2025-10-15  0.781710  0.050076  0.050076    0.118138
+
+  Phase 5 completed in 847s
+
+============================================================
+All robustness experiments complete! (18744s)
+  Results: output/robustness/
+============================================================

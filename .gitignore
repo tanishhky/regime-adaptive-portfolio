@@ -11,3 +11,4 @@ paper/*
 !paper/fig/
 !output/.gitkeep
 .claude/
+prompt.md

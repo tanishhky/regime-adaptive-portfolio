@@ -1,0 +1,36 @@
+/Users/tanishkyadav/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[                       0%                       ][*******               15%                       ]  2 of 13 completed[***********           23%                       ]  3 of 13 completed[***************       31%                       ]  4 of 13 completed[******************    38%                       ]  5 of 13 completed[**********************46%                       ]  6 of 13 completed[**********************54%*                      ]  7 of 13 completed[**********************62%*****                  ]  8 of 13 completed[**********************69%********               ]  9 of 13 completed[**********************77%************           ]  10 of 13 completed[**********************85%****************       ]  11 of 13 completed[**********************92%*******************    ]  12 of 13 completed[*********************100%***********************]  13 of 13 completed
+
+1 Failed download:
+['XLU']: TypeError("'NoneType' object is not subscriptable")
+Starting Phase 3: Sensitivity Analysis
+  3a) Transaction Cost Sensitivity
+  3b) Walk-Forward Window Sensitivity
+  3c) Core Basket Threshold Sensitivity
+  3d) Regime-Conditional (VIX-Scaled) Costs
+Phase 3 Sensitivity Analysis Complete.
+ Cost_bps   Sharpe    Max DD  Ann_Ret
+        0 0.582647 -0.188616 0.123721
+        5 0.568526 -0.190215 0.121781
+       10 0.554402 -0.192261 0.119842
+       15 0.540275 -0.194326 0.117902
+       20 0.526145 -0.196391 0.115962
+       30 0.497883 -0.200521 0.112083
+       50 0.441352 -0.208781 0.104324
+              Config  Train_D  Step_D   Sharpe    Max DD
+       1yr/Quarterly      252      63 0.453066 -0.339273
+2yr/Quarterly (Base)      504      63 0.554402 -0.192261
+       3yr/Quarterly      756      63 0.551267 -0.165443
+         2yr/Monthly      504      21 0.522719 -0.187161
+        2yr/Semi-Ann      504     126 0.531839 -0.192261
+ Threshold   Sharpe    Max DD  Ann_Ret
+       0.5 0.598818 -0.156720 0.123896
+       0.6 0.578577 -0.165354 0.122011
+       0.7 0.554402 -0.192261 0.119842
+       0.8 0.527562 -0.227246 0.117722
+       0.9 0.472911 -0.250751 0.111952
+             Cost_Model   Sharpe    Max_DD  Ann_Ret
+             flat_10bps 0.554402 -0.192261 0.119842
+             vix_scaled 0.538441 -0.197451 0.117672
+vix_scaled_conservative 0.516334 -0.202111 0.114647
