@@ -73,8 +73,8 @@ def plot_regime_detection(
 
     # Panel 2: Individual detector signals
     ax = axes[1]
-    colors = {"cusum": "#1f77b4", "ewma": "#ff7f0e",
-              "markov": "#2ca02c", "structural": "#d62728"}
+    colors = {"cusum": "#1f77b4", "correlation": "#ff7f0e",
+              "breadth": "#2ca02c", "skewness": "#d62728"}
     for col in detector_df.columns:
         ax.plot(detector_df.index, detector_df[col], label=col.upper(),
                 alpha=0.8, linewidth=0.7, color=colors.get(col, "gray"))
@@ -119,7 +119,7 @@ def plot_membership_functions(
     """2×2 subplot of calibrated sigmoid membership functions."""
     _ensure_dir()
     if detector_names is None:
-        detector_names = ["CUSUM", "EWMA", "Markov-Switching", "Structural Break"]
+        detector_names = ["CUSUM", "Correlation", "Breadth", "Skewness"]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     x = np.linspace(0, 1, 200)

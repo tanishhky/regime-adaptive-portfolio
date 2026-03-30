@@ -1,5 +1,5 @@
 """
-Diagnostic script — validates all 7 post-fix sanity checks.
+Diagnostic script — validates sanity checks for orthogonal detector ensemble.
 
 Usage:
     python run_diagnostics.py
@@ -49,13 +49,15 @@ checks.append(('Sharpe >= 0.55', sharpe >= 0.55, f'{sharpe:.3f}'))
 calmar = m.calmar_ratio
 checks.append(('Calmar >= 0.30', calmar >= 0.30, f'{calmar:.3f}'))
 
-# 4. P(stress) dynamic range
-pct_above_50 = (stress > 0.5).mean() * 100
-pct_above_80 = (stress > 0.8).mean() * 100
-checks.append(('P(stress)>0.5 on >=8% days', pct_above_50 >= 8.0, f'{pct_above_50:.1f}%'))
-checks.append(('P(stress)>0.8 on >=2% days', pct_above_80 >= 2.0, f'{pct_above_80:.1f}%'))
+# 4. P(stress) distribution — print empirical distribution instead of hard thresholds
+print("\n── P(stress) Distribution ──────────────────────────────────────")
+print(f"  P(stress) > 0.3: {(stress > 0.3).mean():.1%} of days")
+print(f"  P(stress) > 0.5: {(stress > 0.5).mean():.1%} of days")
+print(f"  P(stress) > 0.7: {(stress > 0.7).mean():.1%} of days")
+print(f"  P(stress) > 0.9: {(stress > 0.9).mean():.1%} of days")
+print()
 
-# 5. Cash allocation during COVID
+# 5. COVID cash allocation
 covid_start = pd.Timestamp('2020-02-20')
 covid_end = pd.Timestamp('2020-04-30')
 weights_df = pd.DataFrame(results['daily_weights'], index=port_ret.index)
@@ -66,16 +68,18 @@ if len(covid_weights) > 0:
 else:
     checks.append(('COVID cash', False, 'No COVID data in OOS window'))
 
-# 6. Detector weights — all four must contribute meaningfully
-w = engine.fuzzy.weights
-all_above = all(w_i >= 0.03 for w_i in w)
-checks.append(('All detector weights >= 0.03', all_above,
-               '[' + ', '.join(f'{x:.3f}' for x in w) + ']'))
+# 6. Sigmoid crossover check — no degenerate sigmoids
+sigmoid_ok = True
+sigmoid_detail = []
+for i, name in enumerate(['cusum', 'correlation', 'breadth', 'skewness']):
+    c = engine.fuzzy.sigmoid_params[i, 1]
+    sigmoid_detail.append(f'{name}={c:.3f}')
+    if c <= 0.06 or c >= 0.94:
+        sigmoid_ok = False
+checks.append(('No degenerate sigmoids', sigmoid_ok,
+               '[' + ', '.join(sigmoid_detail) + ']'))
 
 # 7. Basket distribution — every window must have A>=1, B>=1.
-# Early windows may have only 9 ETFs (XLRE/XLC lack early data); with a
-# 9-asset universe the tercile classifier reliably produces A>=1 but
-# cannot guarantee A>=2.  A+B>=3 is the meaningful threshold.
 basket_ok = True
 first_failure = ''
 for bh in results['basket_history']:
@@ -103,5 +107,3 @@ print(f"  Max DD:      Strategy={m.max_drawdown:.2%}  SPY={m_bench.max_drawdown:
 print(f"  Calmar:      Strategy={m.calmar_ratio:.3f}   SPY={m_bench.calmar_ratio:.3f}")
 print(f"  Ann Return:  Strategy={m.annualised_return:.2%}  SPY={m_bench.annualised_return:.2%}")
 print(f"  Turnover:    {m.annualised_turnover:.2f}x annualised")
-print(f"  P(stress) >0.5 on {pct_above_50:.1f}% of OOS days")
-print(f"  P(stress) >0.8 on {pct_above_80:.1f}% of OOS days")

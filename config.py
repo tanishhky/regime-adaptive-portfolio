@@ -37,3 +37,8 @@ SECTOR_ETFS: dict[str, str] = {
 
 BENCHMARK: str = "SPY"
 VIX_TICKER: str = "^VIX"
+
+# ── Detector windows ─────────────────────────────────────────────────────────
+CORRELATION_WINDOW: int = 21
+BREADTH_WINDOW: int = 21
+SKEWNESS_WINDOW: int = 63

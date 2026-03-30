@@ -106,7 +106,7 @@ def main() -> None:
     generate_all_figures(
         results, prices,
         fuzzy_aggregator=engine.fuzzy,
-        markov_detector=engine.markov,
+        markov_detector=None,
         assignments=assignments,
         half_life_median=half_life_median,
         cvar_75=cvar_75,

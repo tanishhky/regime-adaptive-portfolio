@@ -12,9 +12,9 @@ import pandas as pd
 import pytest
 
 from src.detectors.cusum import CUSUMDetector
-from src.detectors.ewma import EWMADetector
-from src.detectors.markov_switching import MarkovSwitchingDetector
-from src.detectors.structural_break import StructuralBreakDetector
+from src.detectors.correlation import CorrelationDetector
+from src.detectors.breadth import BreadthDetector
+from src.detectors.skewness import SkewnessDetector
 from src.detectors.fuzzy_aggregator import FuzzyAggregator
 
 
@@ -30,6 +30,18 @@ def synthetic_returns():
     returns = np.concatenate([calm, crisis, recovery])
     dates = pd.bdate_range("2020-01-01", periods=len(returns))
     return pd.Series(returns, index=dates, name="synthetic")
+
+
+@pytest.fixture
+def synthetic_sector_returns():
+    """Synthetic sector returns: 11 sectors."""
+    np.random.seed(42)
+    n_days = 700
+    n_sectors = 11
+    data = np.random.normal(0.0005, 0.01, (n_days, n_sectors))
+    dates = pd.bdate_range("2020-01-01", periods=n_days)
+    tickers = [f"SEC{i}" for i in range(n_sectors)]
+    return pd.DataFrame(data, index=dates, columns=tickers)
 
 
 @pytest.fixture
@@ -72,74 +84,72 @@ class TestCUSUM:
         assert crisis_mean > calm_mean
 
 
-# ── EWMA tests ────────────────────────────────────────────────────────────────
+# ── Correlation Detector tests ───────────────────────────────────────────────
 
-class TestEWMA:
-    def test_signal_range(self, synthetic_returns):
-        """EWMA signals must be in [0, 1]."""
-        det = EWMADetector()
-        det.calibrate(synthetic_returns[:300])
-        sig = det.signal_series(synthetic_returns)
+class TestCorrelation:
+    def test_correlation_detector(self):
+        """Correlation detector returns valid signal."""
+        from src.detectors.correlation import CorrelationDetector
+        det = CorrelationDetector(window=5)
+        fake_train = pd.DataFrame(np.random.randn(10, 11) * 0.01)
+        det.fit(fake_train)
+        # All sectors move together: should produce high signal
+        same_move = np.ones(11) * -0.03
+        sig = det.signal(same_move)
+        assert 0.0 <= sig <= 1.0, f"Signal out of range: {sig}"
+
+    def test_signal_range(self, synthetic_sector_returns):
+        """Correlation signals must be in [0, 1]."""
+        det = CorrelationDetector(window=21)
+        det.fit(synthetic_sector_returns.iloc[:100])
+        sig = det.signal_series(synthetic_sector_returns)
         assert sig.min() >= 0.0
         assert sig.max() <= 1.0
 
-    def test_handles_nan(self, nan_returns):
-        """EWMA should handle NaN returns gracefully."""
-        det = EWMADetector()
-        clean = nan_returns.dropna()
-        det.calibrate(clean)
-        sig = det.signal_series(clean)
-        assert not sig.isna().any()
 
-    def test_lambda_ordering(self, synthetic_returns):
-        """λ_fast must be < λ_slow."""
-        det = EWMADetector()
-        det.calibrate(synthetic_returns[:300])
-        assert det.lambda_fast < det.lambda_slow
+# ── Breadth Detector tests ───────────────────────────────────────────────────
+
+class TestBreadth:
+    def test_breadth_detector(self):
+        """Breadth detector returns valid signal."""
+        from src.detectors.breadth import BreadthDetector
+        det = BreadthDetector(window=5)
+        fake_train = pd.DataFrame(np.random.randn(10, 11) * 0.01)
+        det.fit(fake_train)
+        # All sectors negative: should produce high signal
+        bad_day = np.ones(11) * -0.02
+        sig = det.signal(bad_day)
+        assert 0.0 <= sig <= 1.0, f"Signal out of range: {sig}"
+
+    def test_signal_range(self, synthetic_sector_returns):
+        """Breadth signals must be in [0, 1]."""
+        det = BreadthDetector(window=21)
+        det.fit(synthetic_sector_returns.iloc[:100])
+        sig = det.signal_series(synthetic_sector_returns)
+        assert sig.min() >= 0.0
+        assert sig.max() <= 1.0
 
 
-# ── Markov-Switching tests ────────────────────────────────────────────────────
+# ── Skewness Detector tests ─────────────────────────────────────────────────
 
-class TestMarkovSwitching:
-    def test_filtered_not_smoothed(self, synthetic_returns):
-        """Model must use filtered probabilities (no lookahead)."""
-        det = MarkovSwitchingDetector()
-        det.fit(synthetic_returns[:400])
-        # Filtered probability is a single value carried forward
-        sig = det.signal(0.01)
-        assert 0.0 <= sig <= 1.0
+class TestSkewness:
+    def test_skewness_detector(self):
+        """Skewness detector returns valid signal."""
+        from src.detectors.skewness import SkewnessDetector
+        det = SkewnessDetector(window=10)
+        # Mostly small positive returns with a few large negatives → negative skew
+        returns = np.concatenate([np.ones(8) * 0.005, np.array([-0.05, -0.06])])
+        det.fit(returns)
+        sig = det.signal(-0.04)
+        assert 0.0 <= sig <= 1.0, f"Signal out of range: {sig}"
 
     def test_signal_range(self, synthetic_returns):
-        """Signal must be in [0, 1]."""
-        det = MarkovSwitchingDetector()
-        det.fit(synthetic_returns[:400])
-        sig = det.signal(0.01)
-        assert 0.0 <= sig <= 1.0
-
-    def test_transition_matrix(self, synthetic_returns):
-        """Transition matrix should exist after fitting."""
-        det = MarkovSwitchingDetector()
-        det.fit(synthetic_returns[:400])
-        tm = det.transition_matrix
-        assert tm is not None
-
-
-# ── Structural Break tests ────────────────────────────────────────────────────
-
-class TestStructuralBreak:
-    def test_signal_range(self, synthetic_returns):
-        """Signal must be in [0, 1]."""
-        det = StructuralBreakDetector()
-        det.fit(synthetic_returns[:400])
-        sig = det.signal(0.01)
-        assert 0.0 <= sig <= 1.0
-
-    def test_detects_regime_change(self, synthetic_returns):
-        """Should detect the structural break between calm and crisis."""
-        det = StructuralBreakDetector()
-        det.fit(synthetic_returns[:500])
-        # At least some breakpoints should be detected
-        assert len(det.breakpoints) >= 0  # May or may not detect
+        """Skewness signals must be in [0, 1]."""
+        det = SkewnessDetector(window=63)
+        det.fit(synthetic_returns.iloc[:100].values)
+        sig = det.signal_series(synthetic_returns)
+        assert sig.min() >= 0.0
+        assert sig.max() <= 1.0
 
 
 # ── Fuzzy Aggregator tests ────────────────────────────────────────────────────
@@ -152,9 +162,26 @@ class TestFuzzyAggregator:
             result = fuzzy.aggregate(signals)
             assert 0.0 <= result <= 1.0
 
-    def test_weights_sum_to_one(self, synthetic_returns):
-        """After calibration, weights must sum to 1."""
+    def test_max_of_top2_needs_agreement(self):
+        """Max-of-top-2 should produce lower signal when only 1 detector is high."""
+        fuzzy = FuzzyAggregator()
+        # Set all sigmoids to identity-like (steep, centered)
+        fuzzy.sigmoid_params = np.array([
+            [50.0, 0.5], [50.0, 0.5], [50.0, 0.5], [50.0, 0.5]
+        ])
+        # Only 1 detector high → second highest is low
+        one_high = fuzzy.aggregate([1.0, 0.0, 0.0, 0.0])
+        # Two detectors high → second highest is high
+        two_high = fuzzy.aggregate([1.0, 1.0, 0.0, 0.0])
+        assert two_high > one_high
+
+    def test_calibration(self, synthetic_returns):
+        """Calibration should produce valid sigmoid parameters."""
         fuzzy = FuzzyAggregator()
         signal_matrix = np.random.rand(len(synthetic_returns), 4)
         fuzzy.calibrate(signal_matrix, synthetic_returns)
-        assert abs(fuzzy.weights.sum() - 1.0) < 1e-6
+        # Check sigmoid params are within bounds
+        for i in range(4):
+            a, c = fuzzy.sigmoid_params[i]
+            assert 1.0 <= a <= 50.0
+            assert 0.05 <= c <= 0.95

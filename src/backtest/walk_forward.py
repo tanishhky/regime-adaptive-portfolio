@@ -8,8 +8,7 @@ At each rebalance step:
 4. Calibrate entry/exit thresholds
 5. Run day-by-day through the out-of-sample test window
 
-CRITICAL: Markov-Switching uses filtered probabilities (not smoothed).
-GARCH forecasts are 1-step-ahead from the last training observation.
+CRITICAL: All detectors use only past data. No smoothed probabilities.
 """
 
 from __future__ import annotations
@@ -22,9 +21,9 @@ import pandas as pd
 
 import config
 from src.detectors.cusum import CUSUMDetector
-from src.detectors.ewma import EWMADetector
-from src.detectors.markov_switching import MarkovSwitchingDetector
-from src.detectors.structural_break import StructuralBreakDetector
+from src.detectors.correlation import CorrelationDetector
+from src.detectors.breadth import BreadthDetector
+from src.detectors.skewness import SkewnessDetector
 from src.detectors.fuzzy_aggregator import FuzzyAggregator
 from src.characterization.volatility import GARCHVolatility
 from src.characterization.recovery import RecoveryEstimator
@@ -46,9 +45,9 @@ class WalkForwardEngine:
 
         # Detectors
         self.cusum = CUSUMDetector()
-        self.ewma = EWMADetector()
-        self.markov = MarkovSwitchingDetector()
-        self.structural = StructuralBreakDetector()
+        self.correlation = CorrelationDetector(window=21)
+        self.breadth = BreadthDetector(window=21)
+        self.skewness = SkewnessDetector(window=63)
 
         # Characterisation
         self.garch = GARCHVolatility()
@@ -145,16 +144,24 @@ class WalkForwardEngine:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
 
+                # CUSUM: calibrate on SPY returns
                 self.cusum.calibrate(train_spy)
-                self.ewma.calibrate(train_spy)
-                self.markov.fit(train_spy)
-                self.structural.fit(train_spy)
+
+                # New orthogonal detectors: reset + fit
+                self.correlation.reset()
+                self.correlation.fit(train_sector)
+
+                self.breadth.reset()
+                self.breadth.fit(train_sector)
+
+                self.skewness.reset()
+                self.skewness.fit(train_spy.values)
 
                 # Build signal matrix over the training window
                 s1 = self.cusum.signal_series(train_spy)
-                s2 = self.ewma.signal_series(train_spy)
-                s3 = self.markov.signal_series(train_spy)
-                s4 = self.structural.signal_series(train_spy)
+                s2 = self.correlation.signal_series(train_sector)
+                s3 = self.breadth.signal_series(train_sector)
+                s4 = self.skewness.signal_series(train_spy)
 
                 common_idx = (
                     s1.index.intersection(s2.index)
@@ -217,9 +224,16 @@ class WalkForwardEngine:
 
             # ── 6. Reset detectors for OOS window ────────────────────
             self.cusum.reset_accumulators()
-            # Markov filter state persists across windows (intentional).
-            # Clear only the daily accumulation buffer.
-            self.markov._daily_buffer.clear()
+
+            # Re-prime new detectors with training tail for OOS
+            self.correlation.reset()
+            self.correlation.fit(train_sector)
+
+            self.breadth.reset()
+            self.breadth.fit(train_sector)
+
+            self.skewness.reset()
+            self.skewness.fit(train_spy.values)
 
             # ── 7. Run day-by-day through the OOS window ─────────────
             for day_idx in range(wp_start, wp_end):
@@ -229,25 +243,28 @@ class WalkForwardEngine:
                 day = log_ret.index[day_idx]
                 spy_r = float(spy_ret.iloc[day_idx]) if not np.isnan(spy_ret.iloc[day_idx]) else 0.0
 
+                # Get sector returns for today (1-D array)
+                sector_returns_today = sector_ret.iloc[day_idx].fillna(0).values
+
                 # Compute detector signals (point-in-time: today's return only)
                 sig_cusum = self.cusum.signal(spy_r)
-                sig_ewma = self.ewma.signal(spy_r)
-                sig_markov = self.markov.signal(spy_r)
-                sig_struct = self.structural.signal(spy_r)
+                sig_correlation = self.correlation.signal(sector_returns_today)
+                sig_breadth = self.breadth.signal(sector_returns_today)
+                sig_skewness = self.skewness.signal(spy_r)
 
                 detector_sigs = {
                     "cusum": sig_cusum,
-                    "ewma": sig_ewma,
-                    "markov": sig_markov,
-                    "structural": sig_struct,
+                    "correlation": sig_correlation,
+                    "breadth": sig_breadth,
+                    "skewness": sig_skewness,
                 }
 
-                # Structural break assessed live each day
-                structural_break = sig_struct > 0.5
+                # Use correlation spike as structural break proxy
+                structural_break = sig_correlation > 0.5
 
                 # Aggregate to composite P(stress)
                 p_stress = self.fuzzy.aggregate(
-                    [sig_cusum, sig_ewma, sig_markov, sig_struct]
+                    [sig_cusum, sig_correlation, sig_breadth, sig_skewness]
                 )
 
                 # Compute target weights
