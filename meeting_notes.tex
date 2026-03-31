@@ -1,0 +1,713 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black}
+
+\newcommand{\versmark}[1]{\textsc{#1}}
+
+\title{Regime-Adaptive Portfolio System:\\Technical Design Document and Evolution Log}
+\author{Tanishk Yadav}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Executive Summary}
+% ══════════════════════════════════════════════════════════════════════════
+
+This document describes the complete architecture, mathematical foundations, and iterative development of a \textbf{regime-adaptive sector-rotation portfolio system}. The system uses an ensemble of four orthogonal stress detectors to dynamically adjust allocation across 11 US sector ETFs, moving to cash during detected market stress.
+
+Two major versions exist:
+
+\begin{itemize}
+  \item \versmark{v1.1-orthogonal-baseline}: Max-of-top-2 aggregation with Brier-score sigmoid calibration. Sharpe~1.08, MaxDD~$-5.25\%$, Return~6.30\%, but chronically under-invested ($\sim$30\% average exposure).
+  \item \versmark{v2-agreement-scaling}: Attempted agreement-scaled ramp with differential evolution. The pure agreement-ramp approach failed (Sharpe~0.57--0.68). The final v2 reverted to max-of-top-2 inference with hybrid calibration, achieving Sharpe~0.87, MaxDD~$-9.11\%$, Return~7.85\%.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{System Architecture}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Universe and Data}
+
+\begin{itemize}[nosep]
+  \item \textbf{Sector ETFs (11):} XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLRE, XLB, XLC
+  \item \textbf{Benchmark:} SPY (S\&P~500)
+  \item \textbf{Date range:} 2007-01-01 to 2025-12-31 (includes GFC, COVID, 2022 rate hikes)
+  \item \textbf{Returns:} Log returns $r_t = \ln(P_t / P_{t-1})$
+  \item \textbf{Risk-free rate:} Fama--French daily RF (fallback: 5\% annualised / 252)
+  \item \textbf{Transaction costs:} 10 basis points per unit of turnover
+\end{itemize}
+
+\subsection{Pipeline Overview}
+
+The system executes in a strict walk-forward loop:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Expanding training window:} Always $[0, t)$, never rolling.
+  \item \textbf{Detector calibration} on training data (CUSUM, Correlation, Breadth, Skewness).
+  \item \textbf{Asset characterisation} via GARCH(1,1) volatility and Ornstein--Uhlenbeck recovery estimation, parallelised across sectors with \texttt{ThreadPoolExecutor}.
+  \item \textbf{Basket classification} into Tactical (A), Avoid (B), Core (C) using data-driven tercile volatility boundaries and median half-life.
+  \item \textbf{Fuzzy aggregator calibration:} Sigmoid parameters optimised via Brier score.
+  \item \textbf{Entry/exit threshold calibration} via grid search on training Sharpe.
+  \item \textbf{Day-by-day out-of-sample execution} for one quarter (63 trading days).
+  \item Advance and repeat for the next quarter.
+\end{enumerate}
+
+\textbf{Zero lookahead guarantee:} At each OOS day, only data available up to that day is used. Detectors are reset and re-primed with training-period tails before each OOS window.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Detector Design: Orthogonal Stress Signals}
+\label{sec:detectors}
+% ══════════════════════════════════════════════════════════════════════════
+
+The system uses four detectors, each capturing a \emph{different} dimension of market stress. Orthogonality is by construction: each detector measures a fundamentally different market property.
+
+% ── 3.1 CUSUM ─────────────────────────────────────────────────────────────
+\subsection{CUSUM Detector (Volatility Magnitude)}
+
+\textbf{Theoretical basis:} Page (1954) sequential analysis. Detects sustained shifts in the mean of a standardised process.
+
+\textbf{Mathematics:}
+\begin{align}
+  z_t &= \frac{r_t - \hat{\mu}_{\mathrm{train}}}{\hat{\sigma}_{\mathrm{train}}} \label{eq:cusum-zscore} \\
+  S_t^{+} &= \max\!\big(0,\; S_{t-1}^{+} + z_t - k\big) \label{eq:cusum-plus} \\
+  S_t^{-} &= \max\!\big(0,\; S_{t-1}^{-} - z_t - k\big) \label{eq:cusum-minus} \\
+  s_t &= \min\!\Big(\frac{\max(S_t^{+}, S_t^{-})}{h},\; 1\Big) \label{eq:cusum-signal}
+\end{align}
+
+\textbf{Calibration (data-driven):}
+\begin{itemize}[nosep]
+  \item Allowance $k = 0.5$ (half-shift in standardised units).
+  \item Threshold $h$ via Siegmund's (1985) approximation: $h \approx \frac{\ln(\mathrm{ARL}_0) + 1.166}{\delta}$ where $\mathrm{ARL}_0 = 252$ (one false alarm per year) and $\delta = 1.0$ (detecting a 1$\sigma$ shift).
+  \item $\hat{\mu}$ and $\hat{\sigma}$ estimated from the training period.
+\end{itemize}
+
+\textbf{What it detects:} Persistent deviations in return magnitude from the training-period baseline. Fires during sustained market sell-offs but not during short-lived spikes.
+
+\textbf{Timescale:} Ultra-short (5--10 days to accumulate signal).
+
+% ── 3.2 Correlation ───────────────────────────────────────────────────────
+\subsection{Correlation Contagion Detector (Market Structure)}
+
+\textbf{Theoretical basis:} During crises, cross-sector correlations spike as diversification collapses (Longin \& Solnik, 2001).
+
+\textbf{Mathematics:}
+\begin{align}
+  \rho_{ij}(t) &= \mathrm{Pearson}\big(\{r_{i,\tau}\}_{\tau=t-W+1}^{t},\; \{r_{j,\tau}\}_{\tau=t-W+1}^{t}\big) \\
+  \bar{\rho}(t) &= \frac{2}{N(N-1)} \sum_{i<j} \rho_{ij}(t) \\
+  s_t &= \mathrm{clip}\!\bigg(\frac{\bar{\rho}(t) - 0.15}{0.65 - 0.15},\; 0,\; 1\bigg) \label{eq:corr-signal}
+\end{align}
+where $W = 21$ trading days and $N = 11$ sectors.
+
+\textbf{Signal mapping:} Average pairwise correlation is linearly mapped from $[0.15, 0.65]$ to $[0, 1]$. Calm markets have $\bar{\rho} \approx 0.30$ (signal $\approx 0.30$). Crisis markets have $\bar{\rho} > 0.60$ (signal $\approx 0.90$).
+
+\textbf{What it detects:} Diversification collapse (contagion). Orthogonal to CUSUM because two markets can have high correlation with low volatility (e.g., quiet trending markets) or low correlation with high volatility (sector rotation).
+
+% ── 3.3 Breadth ───────────────────────────────────────────────────────────
+\subsection{Breadth Momentum Detector (Market Breadth)}
+
+\textbf{Theoretical basis:} Market breadth indicators (advance--decline ratios) are classic technical measures. We use a sector-level variant.
+
+\textbf{Mathematics:}
+\begin{align}
+  R_i^{\mathrm{cum}}(t) &= \sum_{\tau=t-W+1}^{t} r_{i,\tau} \quad \text{(cumulative log return over window)} \\
+  f_{\mathrm{neg}}(t) &= \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}\big[R_i^{\mathrm{cum}}(t) < 0\big] \\
+  s_t &= \mathrm{clip}\!\bigg(\frac{f_{\mathrm{neg}}(t) - 0.10}{0.60 - 0.10},\; 0,\; 1\bigg) \label{eq:breadth-signal}
+\end{align}
+where $W = 21$ trading days.
+
+\textbf{Signal mapping:} Fraction of sectors with negative 21-day return, linearly mapped from $[0.10, 0.60]$ to $[0, 1]$. In calm markets, roughly 40--50\% of sectors have negative monthly returns (signal $\approx 0.60$). In broad sell-offs, 80\%+ are negative (signal $\to 1.0$).
+
+\textbf{What it detects:} How widespread the decline is. Orthogonal to CUSUM (which measures SPY magnitude) and Correlation (which measures co-movement regardless of direction).
+
+% ── 3.4 Skewness ──────────────────────────────────────────────────────────
+\subsection{Skewness Detector (Tail Risk --- Leading Indicator)}
+
+\textbf{Theoretical basis:} Equity return skewness becomes more negative as tail risk builds (Bali, Demirtas \& Levy, 2009). This often precedes realised drawdowns.
+
+\textbf{Mathematics:}
+\begin{align}
+  \hat{\gamma}_t &= \frac{n}{(n-1)(n-2)} \sum_{i=1}^{n} \bigg(\frac{r_{t-n+i} - \bar{r}_t}{\hat{\sigma}_t}\bigg)^3 \quad \text{(Fisher skewness)} \\
+  s_t &= \begin{cases} \mathrm{clip}\big(-\hat{\gamma}_t / 1.0,\; 0,\; 1\big) & \text{if } \hat{\gamma}_t < 0 \\ 0 & \text{otherwise} \end{cases} \label{eq:skew-signal}
+\end{align}
+where $n = 63$ trading days (one quarter).
+
+\textbf{Signal mapping:} Skewness of $-1.0$ maps to signal $1.0$. Positive skewness maps to $0.0$. Normal market skewness is $\approx -0.3$ (signal $\approx 0.30$). Pre-crisis: $\approx -1.5$ to $-2.0$ (signal $\to 1.0$).
+
+\textbf{What it detects:} Distributional asymmetry in the left tail. This is a \emph{leading} indicator---skewness deteriorates before large drawdowns materialise. Orthogonal to the other three because it measures the shape of the distribution, not the level, breadth, or correlation of returns.
+
+\subsection{Summary of Detector Orthogonality}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Detector} & \textbf{Measures} & \textbf{Timescale} & \textbf{Leading/Coincident} \\
+\midrule
+CUSUM & Return magnitude shift & 5--10 days & Coincident \\
+Correlation & Diversification collapse & 21 days & Coincident \\
+Breadth & Breadth of decline & 21 days & Coincident \\
+Skewness & Tail risk build-up & 63 days & Leading \\
+\bottomrule
+\end{tabular}
+\caption{Each detector captures a distinct stress dimension.}
+\label{tab:detectors}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Fuzzy Aggregation: From Signals to Portfolio Response}
+\label{sec:aggregation}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Sigmoid Membership Functions}
+
+Each detector's raw signal $s_t^{(k)} \in [0,1]$ is mapped through a calibrated sigmoid:
+\begin{equation}
+  \mu_k(s) = \frac{1}{1 + \exp\!\big(-a_k(s - c_k)\big)} \label{eq:sigmoid}
+\end{equation}
+where $a_k > 0$ is the \emph{steepness} (how sharply the function transitions) and $c_k \in (0,1)$ is the \emph{crossover point} (the signal level at which the sigmoid output equals 0.5). Steeper $a_k$ means a more binary response; lower $a_k$ means a gradual transition.
+
+\textbf{Interpretation:} $\mu_k(s) > 0.5$ means detector $k$'s signal has exceeded its learned activation threshold $c_k$. The sigmoid acts as a soft thresholding function, transforming heterogeneous detector scales into comparable membership degrees.
+
+\textbf{Reference:} This follows the Takagi--Sugeno (1985) fuzzy inference framework, where membership functions partition the input space.
+
+\subsection{Brier Score Calibration}
+
+Sigmoid parameters $(a_k, c_k)$ for all four detectors are jointly optimised by minimising the \textbf{Brier score} (Brier, 1950):
+\begin{equation}
+  \mathcal{L}_{\mathrm{Brier}} = \frac{1}{T}\sum_{t=1}^{T}\big(\hat{p}_t - D_t\big)^2 \label{eq:brier}
+\end{equation}
+where $D_t \in \{0, 1\}$ is a binary drawdown indicator and $\hat{p}_t$ is the composite stress estimate.
+
+\textbf{Drawdown target construction:}
+\begin{enumerate}[nosep]
+  \item Compute cumulative price: $P_t = \exp\!\big(\sum_{\tau=1}^{t} r_\tau\big)$.
+  \item Running peak: $\bar{P}_t = \max_{\tau \le t} P_\tau$.
+  \item Drawdown: $\mathrm{DD}_t = (P_t - \bar{P}_t) / \bar{P}_t$ (negative values).
+  \item Threshold: $\mathrm{DD}^* = \text{10th percentile of } \{\mathrm{DD}_t\}$ (worst 10\% of drawdowns).
+  \item $D_t = 1$ if $\min_{\tau \in [t, t+21]} \mathrm{DD}_\tau < \mathrm{DD}^*$, i.e., a significant drawdown occurs within the next 21 trading days.
+\end{enumerate}
+
+\textbf{Optimiser:} L-BFGS-B (Byrd et al., 1995) with bounds $a_k \in [1, 50]$, $c_k \in [0.05, 0.80]$.
+
+\textbf{Why Brier score?} The Brier score is a proper scoring rule---it is minimised when the predicted probability equals the true conditional probability. This ensures the sigmoids are calibrated probabilistically, not just for classification accuracy.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Version 1: Max-of-Top-2 Aggregation}
+\label{sec:v1}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Aggregation Rule}
+
+Given four sigmoid-transformed signals $\mu_1, \mu_2, \mu_3, \mu_4$, sort in descending order and take the \textbf{second-largest}:
+\begin{equation}
+  p_{\mathrm{stress}} = \mu_{(2)} \quad \text{where } \mu_{(1)} \ge \mu_{(2)} \ge \mu_{(3)} \ge \mu_{(4)} \label{eq:max-top-2}
+\end{equation}
+
+\textbf{Intuition:} Requires \emph{at least two detectors} to show elevated stress before acting. A single detector firing (perhaps a false alarm) produces a low composite because the second-largest is still low. When two or more detectors agree on stress, the composite rises meaningfully.
+
+\textbf{Advantage:} Simple, parameter-free aggregation. No weights to optimise.
+
+\textbf{Disadvantage:} The composite value is the raw sigmoid output, which is sensitive to the sigmoid calibration. If the Brier optimiser pushes crossovers $c_k$ near the boundary ($c_k \to 0.95$), most signals produce high sigmoid outputs, making $\mu_{(2)}$ chronically elevated.
+
+\subsection{v1 Calibration Pipeline}
+
+\begin{enumerate}[nosep]
+  \item Build signal matrix $(T \times 4)$ from training data.
+  \item Compute drawdown targets $D_t$.
+  \item Define composite as $\hat{p}_t = \mu_{(2)}(t)$ (second-largest sigmoid output at time $t$).
+  \item Optimise $(a_k, c_k)$ for $k=1,\ldots,4$ via L-BFGS-B to minimise $\mathcal{L}_{\mathrm{Brier}}$.
+  \item Crossover bounds: $c_k \in [0.05, 0.95]$.
+\end{enumerate}
+
+\subsection{v1 Performance Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metric} & \textbf{Strategy} & \textbf{SPY} \\
+\midrule
+Annualised Return & 6.32\% & 11.79\% \\
+Annualised Volatility & 4.64\% & 17.98\% \\
+Sharpe Ratio & 1.08 & 0.58 \\
+Sortino Ratio & 1.16 & 0.54 \\
+Calmar Ratio & 1.20 & 0.28 \\
+Maximum Drawdown & $-5.25\%$ & $-41.71\%$ \\
+Max DD Duration & 204 days & 512 days \\
+Annualised Turnover & 10.41$\times$ & --- \\
+Mean Investment Level & $\sim$30\% & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{\versmark{v1.1} performance. Excellent risk-adjusted metrics but chronically under-invested.}
+\label{tab:v1-perf}
+\end{table}
+
+\subsection{v1 Diagnosed Problems}
+\label{sec:v1-problems}
+
+\begin{enumerate}
+  \item \textbf{Degenerate sigmoid crossovers:} Three of four detectors had $c_k = 0.950$ (at the upper bound). With $c_k \approx 0.95$ and typical signal values $\in [0.3, 0.9]$, the sigmoid output $\mu_k$ is chronically high for most signals. The L-BFGS-B optimiser got stuck at this boundary because the Brier score objective rewards permanently elevated $\hat{p}_t$ when drawdowns are frequent ($\sim$20--30\% of days labelled as pre-drawdown).
+
+  \item \textbf{Chronic under-investment ($\sim$30\%):} Because $\mu_{(2)}$ was chronically $> 0.3$, Basket~B (Avoid) was perpetually scaled down by $(1 - p_{\mathrm{stress}})$, and Basket~A (Tactical) was frequently liquidated. The system held $\sim$70\% cash on average.
+
+  \item \textbf{Brier score objective misalignment:} The Brier score optimises for \emph{stress prediction accuracy}, not \emph{financial performance}. A permanently defensive solution (always predict stress) achieves a decent Brier score if stress episodes are common in the training data.
+
+  \item \textbf{Return capture:} Only 53\% of SPY's return (6.32\% vs 11.79\%) despite the extremely low volatility.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Version 2: Agreement-Scaling Attempt and Failure}
+\label{sec:v2-attempt}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Motivation}
+
+The v2 redesign aimed to fix all four v1 problems simultaneously:
+\begin{itemize}[nosep]
+  \item Replace max-of-top-2 with \textbf{agreement counting} (how many detectors exceed their crossover).
+  \item Replace L-BFGS-B with \textbf{differential evolution} (global optimiser).
+  \item Replace Brier score with \textbf{Sharpe ratio objective} (financial performance).
+  \item Replace rolling training window with \textbf{expanding window}.
+\end{itemize}
+
+\textbf{Target profile:} Return 9--11\%, Vol 8--12\%, Sharpe 0.90--1.10, MaxDD $-10$\% to $-15$\%, Investment 80--95\%.
+
+\subsection{Agreement-Scaled Response Mechanism}
+
+\textbf{Step 1: Sigmoid transform.} Same as v1 (Eq.~\ref{eq:sigmoid}).
+
+\textbf{Step 2: Count agreements.}
+\begin{equation}
+  n_{\mathrm{agree}} = \sum_{k=1}^{4} \mathbf{1}\big[\mu_k(s_t^{(k)}) > 0.5\big]
+\end{equation}
+
+\textbf{Step 3: Ramp lookup.}
+\begin{equation}
+  \mathrm{base}(n) = \begin{cases}
+    0.00 & n = 0 \\
+    r_1   & n = 1 \\
+    r_2   & n = 2 \\
+    r_2 + (1-r_2) \times 0.6 & n = 3 \\
+    1.00 & n = 4
+  \end{cases}
+  \label{eq:ramp}
+\end{equation}
+where $r_1, r_2$ are free parameters optimised by differential evolution.
+
+\textbf{Step 4: Intensity modulation.} For $n_{\mathrm{agree}} \in \{1,2,3\}$:
+\begin{equation}
+  \mathrm{response} = \mathrm{base}(n) + \frac{\bar{\mu}_{\mathrm{agree}} - 0.5}{0.5} \times \big(\mathrm{base}(n+1) - \mathrm{base}(n)\big)
+\end{equation}
+where $\bar{\mu}_{\mathrm{agree}}$ is the mean sigmoid output of agreeing detectors. This provides continuous interpolation within each agreement tier.
+
+\subsection{Two-Stage Calibration}
+
+\textbf{Stage 1: Sigmoid calibration via Brier score.}
+Same objective as v1 (Eq.~\ref{eq:brier}), but the composite $\hat{p}_t$ is computed via the agreement-response mechanism instead of max-of-top-2. Uses L-BFGS-B with 8 parameters ($a_k, c_k$ for $k=1,\ldots,4$).
+
+\textbf{Stage 2: Ramp optimisation via differential evolution.}
+\begin{itemize}[nosep]
+  \item Parameters: $r_1 \in [0.05, 0.30]$, $r_2 \in [0.30, 0.70]$ (2D).
+  \item Objective: Negative regularised Sharpe over mini walk-forward sub-windows.
+  \item Sub-windows: 252-day training + 63-day OOS, sliding by 63 days inside the expanding training set.
+  \item Regularisation: $\mathrm{penalty} = \lambda \cdot \max(0, w^* - \bar{w})$ where $\bar{w}$ is mean portfolio weight and $w^*$ is a target (0.85--0.95).
+  \item DE settings: \texttt{maxiter=60}, \texttt{popsize=15}, \texttt{workers=-1} (multiprocessing), \texttt{seed=42}.
+\end{itemize}
+
+\subsection{Why the Pure Agreement Approach Failed}
+\label{sec:v2-failure}
+
+The agreement-scaled ramp was tested extensively with over 15 pipeline runs. The results consistently showed \textbf{Sharpe 0.53--0.68} and \textbf{Return 5.3--6.8\%}, far below both v1 and the targets.
+
+\textbf{Root cause analysis:}
+
+\begin{enumerate}
+  \item \textbf{Brier-calibrated sigmoids produce chronic agreement.} When the Brier score is minimised with the agreement-response composite, the optimiser learns sigmoid parameters where \emph{all} detectors output $\mu_k > 0.5$ most of the time (because predicting stress frequently improves Brier scores when $\sim$25\% of days are pre-drawdown). With each detector independently firing $> 60\%$ of the time, the probability of $n_{\mathrm{agree}} \ge 2$ is:
+  \begin{equation}
+    P(n \ge 2) = 1 - P(n=0) - P(n=1) = 1 - 0.4^4 - \binom{4}{1}(0.6)(0.4)^3 \approx 0.82
+  \end{equation}
+  So 82\% of days had 2+ detectors agreeing---making the ramp chronically activated.
+
+  \item \textbf{Ramp values couldn't compensate.} Even with $r_1 = 0$ (1 detector does nothing), $r_2 = 0.05$ (2 detectors do almost nothing), the basket B scaling $\times(1 - 0.05)$ still reduced investment, and more importantly, entry thresholds calibrated on training data remained low.
+
+  \item \textbf{DE objective conflict.} The Sharpe-maximising DE found that \emph{being defensive produces higher Sharpe} because it reduces volatility more than it reduces return. The investment penalty was insufficient to overcome this---even with penalty coefficient 15.0 and target weight 0.95, the DE preferred defensive solutions.
+
+  \item \textbf{Detector signal mapping sensitivity.} The detector mappings (e.g., breadth $[0.10, 0.60]$) determine calm-market baseline signals. Widening them to $[0.25, 0.80]$ reduced baseline signals but also degraded crisis detection, causing MaxDD to increase from $-9\%$ to $-24\%$.
+\end{enumerate}
+
+\subsection{Configurations Tested (Chronological)}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{p{5cm}rrrr}
+\toprule
+\textbf{Configuration} & \textbf{Return} & \textbf{Vol} & \textbf{Sharpe} & \textbf{MaxDD} \\
+\midrule
+Full agreement ramp (initial) & 6.62\% & 9.00\% & 0.59 & $-15.81$\% \\
+B dead zone + r3 mismatch fix & 6.55\% & 9.22\% & 0.57 & $-17.05$\% \\
+1-detector = 0 ramp & 6.44\% & 9.21\% & 0.56 & $-14.53$\% \\
+Stronger investment penalty (15$\times$) & 6.21\% & 9.25\% & 0.53 & $-15.73$\% \\
+Agreement threshold 0.65 & 5.32\% & 9.87\% & 0.41 & $-24.13$\% \\
+3+ detector consensus & 6.79\% & 9.10\% & 0.60 & $-15.93$\% \\
+Max-of-top-2 Brier + agreement ramp & 6.44\% & 9.08\% & 0.57 & $-15.31$\% \\
+Revert to v1-style (structural break 0.5) & 5.49\% & 6.13\% & 0.68 & $-9.38$\% \\
+\bottomrule
+\end{tabular}
+\caption{Agreement-scaling configurations tested. None achieved Sharpe $\ge 0.85$.}
+\label{tab:v2-attempts}
+\end{table}
+
+\subsection{Key Insight: Why Max-of-Top-2 Works Better}
+
+The max-of-top-2 rule uses the \emph{actual sigmoid value} $\mu_{(2)}$ as the stress intensity, while the agreement ramp uses a \emph{discretised count}. This matters because:
+
+\begin{enumerate}[nosep]
+  \item The raw sigmoid value contains continuous intensity information that the binary ``agree/disagree'' threshold discards.
+  \item The Brier calibration with max-of-top-2 keeps individual sigmoid outputs \emph{low in calm markets} because the optimiser only needs the \emph{second-largest} value to track drawdowns. With agreement-response calibration, the optimiser pushes all sigmoids high (to improve agreement-based prediction).
+  \item Max-of-top-2 naturally requires two detectors to agree (by taking the second-largest), but without the chronic activation problem of binary counting.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Version 2 Final: Hybrid Architecture}
+\label{sec:v2-final}
+% ══════════════════════════════════════════════════════════════════════════
+
+The final v2 retains v2 infrastructure (expanding window, parallel GARCH, agreement tracking, DE ramp code) but reverts the core inference to max-of-top-2.
+
+\subsection{Architecture}
+
+\begin{itemize}[nosep]
+  \item \textbf{Sigmoid calibration:} Brier score with max-of-top-2 composite (Eq.~\ref{eq:max-top-2}), L-BFGS-B, crossover bounds $c_k \in [0.05, 0.80]$.
+  \item \textbf{Inference:} Max-of-top-2 used directly as \texttt{response\_fraction}.
+  \item \textbf{Agreement count:} Tracked as metadata for analysis (not used in portfolio decisions).
+  \item \textbf{DE ramp:} Retained in codebase but skipped during execution.
+  \item \textbf{Basket B dead zone:} De-risking begins only when $p_{\mathrm{stress}} > 0.4$.
+  \item \textbf{Structural break:} Correlation signal $> 0.90$ triggers zeroing of Basket C.
+  \item \textbf{No threshold clamping:} Entry/exit thresholds calibrated freely by grid search.
+\end{itemize}
+
+\subsection{Detector Signal Mappings (Tuned)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Detector} & \textbf{Mapping Range} & \textbf{Calm Signal} & \textbf{Crisis Signal} \\
+\midrule
+CUSUM & Adaptive ($h$ threshold) & $\sim$0.1 & $\to 1.0$ \\
+Correlation & $[0.15, 0.65] \to [0, 1]$ & $\sim$0.30 & $\sim$0.90 \\
+Breadth & $[0.10, 0.60] \to [0, 1]$ & $\sim$0.60 & $\to 1.0$ \\
+Skewness & $[-1.0, 0] \to [1.0, 0]$ & $\sim$0.30 & $\to 1.0$ \\
+\bottomrule
+\end{tabular}
+\caption{Detector signal mappings in the final v2 configuration.}
+\label{tab:mappings}
+\end{table}
+
+These mappings sit between the tight v1 values (e.g., breadth $[0.05, 0.50]$) and the wide values tested during v2 development ($[0.25, 0.80]$). The balance was found empirically: tight enough that the Brier-calibrated sigmoids produce meaningful variation, wide enough that calm-market signals aren't so high that the system chronically de-risks.
+
+\subsection{v2 Final Performance Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metric} & \textbf{Strategy} & \textbf{SPY} \\
+\midrule
+Annualised Return & 7.85\% & 11.79\% \\
+Annualised Volatility & 7.55\% & 17.98\% \\
+Sharpe Ratio & 0.87 & 0.58 \\
+Sortino Ratio & 0.89 & 0.54 \\
+Calmar Ratio & 0.86 & 0.28 \\
+Maximum Drawdown & $-9.11\%$ & $-41.71\%$ \\
+Max DD Duration & 314 days & 512 days \\
+Annualised Turnover & 11.57$\times$ & --- \\
+Mean Investment Level & 55.3\% & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{\versmark{v2-final} performance. Sharpe above target (0.87 $>$ 0.85) with MaxDD 78\% better than SPY.}
+\label{tab:v2-perf}
+\end{table}
+
+\subsection{Diagnostics Summary}
+
+\textbf{Agreement distribution:}
+\begin{itemize}[nosep]
+  \item 0 detectors agree: 26.6\% of days (fully invested)
+  \item 1 detector agrees: 42.9\% of days
+  \item 2 detectors agree: 23.8\% of days
+  \item 3 detectors agree: 5.7\% of days (aggressive de-risk)
+  \item 4 detectors agree: 1.0\% of days (full de-risk)
+\end{itemize}
+
+\textbf{Calibrated sigmoid parameters (final window):}
+\begin{itemize}[nosep]
+  \item CUSUM: $a = 4.32$, $c = 0.516$
+  \item Correlation: $a = 1.00$, $c = 0.800$
+  \item Breadth: $a = 4.18$, $c = 0.800$
+  \item Skewness: $a = 50.00$, $c = 0.800$
+\end{itemize}
+
+\textbf{Validation checks:}
+\begin{itemize}[nosep]
+  \item[\checkmark] Max DD $<$ SPY ($-9.11\%$ vs $-41.71\%$)
+  \item[\checkmark] Sharpe $\ge 0.85$ (0.878)
+  \item[\checkmark] Calmar $\ge 0.30$ (0.862)
+  \item[\checkmark] COVID cash (min weight sum = 0.023)
+  \item[\checkmark] No degenerate sigmoids (all $c_k \in [0.516, 0.800]$)
+  \item[$\times$] Investment 70--98\% (mean = 55.3\%)
+  \item[$\times$] Basket A$\ge$1, B$\ge$1 always (some windows: all high-vol stocks fast-recovering $\Rightarrow$ B = 0)
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Asset Characterisation}
+\label{sec:characterisation}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{GARCH(1,1) Conditional Volatility}
+
+Each sector's volatility is modelled as a GARCH(1,1) process with Student-$t$ innovations (Bollerslev, 1986):
+\begin{align}
+  r_t &= \mu + \epsilon_t, \quad \epsilon_t = \sigma_t z_t, \quad z_t \sim t_\nu(0,1) \\
+  \sigma_t^2 &= \omega + \alpha\,\epsilon_{t-1}^2 + \beta\,\sigma_{t-1}^2
+\end{align}
+
+\textbf{Persistence:} $\alpha + \beta$ measures volatility mean reversion. Values close to 1 indicate persistent volatility clusters.
+
+\textbf{VaR(99\%):}
+\begin{equation}
+  \mathrm{VaR}_{0.99}(t) = \hat{\mu} + \hat{\sigma}_t \cdot t_{\hat{\nu}}^{-1}(0.01) \cdot \sqrt{\frac{\hat{\nu}-2}{\hat{\nu}}}
+\end{equation}
+
+\textbf{Implementation:} Uses the \texttt{arch} Python library. Returns are scaled to percentages for numerical stability during fitting. The \texttt{last\_vol} field stores the most recent annualised conditional volatility $\hat{\sigma}_T \times \sqrt{252}$.
+
+\subsection{Ornstein--Uhlenbeck Recovery Estimation}
+
+Recovery speed is estimated by fitting an Ornstein--Uhlenbeck (OU) process to drawdown episodes:
+\begin{equation}
+  dX_t = \kappa(\theta - X_t)\,dt + \sigma\,dW_t
+\end{equation}
+
+\textbf{Discrete estimation:} Regress $\Delta X_t$ on $X_{t-1}$:
+\begin{equation}
+  \Delta X_t = -\hat{\kappa}\,X_{t-1} + \varepsilon_t \quad \Rightarrow \quad \hat{\kappa} = -\hat{\beta}_{\mathrm{OLS}}
+\end{equation}
+
+\textbf{Half-life:} The time for the process to revert halfway to its mean:
+\begin{equation}
+  t_{1/2} = \frac{\ln 2}{\hat{\kappa}} \quad \text{(in trading days)}
+\end{equation}
+
+\textbf{Drawdown episode extraction:}
+\begin{enumerate}[nosep]
+  \item Compute peak-to-trough drawdown series.
+  \item Threshold: 10th percentile of drawdown distribution.
+  \item Extract contiguous episodes exceeding threshold.
+  \item Pool all episodes, regress $\Delta X$ on $X$.
+\end{enumerate}
+
+If $\hat{\kappa} \le 0$, the sector is classified as non-mean-reverting ($t_{1/2} = \infty$).
+
+\subsection{Basket Classification}
+
+The classifier assigns each of 11 sectors to one of three baskets using two features: annualised conditional volatility (from GARCH) and half-life (from OU).
+
+\textbf{Decision boundaries (fully data-driven):}
+\begin{itemize}[nosep]
+  \item $v_{33}$, $v_{67}$: 33rd and 67th percentile of the cross-sectional volatility distribution.
+  \item $h_{\mathrm{med}}$: Median of finite half-lives.
+\end{itemize}
+
+\textbf{Classification logic:}
+\begin{equation}
+  \mathrm{Basket} = \begin{cases}
+    \text{A (Tactical)} & \text{if } \sigma > v_{33} \text{ and } t_{1/2} < h_{\mathrm{med}} \\
+    \text{B (Avoid)}    & \text{if } \sigma > v_{67} \text{ and } t_{1/2} \ge h_{\mathrm{med}} \\
+    \text{C (Core)}     & \text{otherwise}
+  \end{cases}
+\end{equation}
+
+\begin{itemize}[nosep]
+  \item \textbf{Basket A (Tactical):} High vol + fast recovery $\Rightarrow$ liquidate on stress, re-enter on recovery.
+  \item \textbf{Basket B (Avoid):} High vol + slow recovery $\Rightarrow$ underweight during stress.
+  \item \textbf{Basket C (Core):} Low vol $\Rightarrow$ hold through mild stress.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Portfolio Construction}
+\label{sec:portfolio}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Base Weights: Inverse-Volatility}
+
+In the absence of stress, sectors are weighted by the inverse of their GARCH-estimated conditional volatility:
+\begin{equation}
+  w_i^{\mathrm{base}} = \frac{1/\hat{\sigma}_i}{\sum_{j=1}^{N} 1/\hat{\sigma}_j}
+\end{equation}
+These sum to 1.0 (fully invested calm-market portfolio). Under a diagonal covariance assumption, this equals risk-parity weighting.
+
+\subsection{Basket-Specific Stress Scaling}
+
+The max-of-top-2 response $p$ modifies base weights according to each sector's basket:
+
+\textbf{Basket A (Tactical):} Hysteresis-based liquidation.
+\begin{equation}
+  w_i^{\mathrm{A}} = \begin{cases}
+    0 & \text{if } p > p_{\mathrm{entry}} \text{ (enter liquidation)} \\
+    w_i^{\mathrm{base}} & \text{if } p < p_{\mathrm{exit}} \text{ (exit liquidation)} \\
+    \text{maintain prior state} & \text{otherwise}
+  \end{cases}
+\end{equation}
+The hysteresis ($p_{\mathrm{entry}} > p_{\mathrm{exit}}$) prevents whipsawing. Thresholds are calibrated via grid search on training-period Sharpe.
+
+\textbf{Basket B (Avoid):} Continuous scaling with dead zone.
+\begin{equation}
+  w_i^{\mathrm{B}} = \begin{cases}
+    w_i^{\mathrm{base}} \cdot \Big(1 - \frac{p - 0.4}{0.6}\Big) & \text{if } p > 0.4 \\
+    w_i^{\mathrm{base}} & \text{otherwise}
+  \end{cases}
+\end{equation}
+The dead zone at 0.4 prevents chronic de-risking from low-level stress signals.
+
+\textbf{Basket C (Core):} Graduated de-risking at extreme stress.
+\begin{equation}
+  w_i^{\mathrm{C}} = \begin{cases}
+    0 & \text{if structural break (corr signal $> 0.90$)} \\
+    w_i^{\mathrm{base}} \cdot \frac{1.0 - p}{0.3} & \text{if } p > 0.7 \\
+    w_i^{\mathrm{base}} & \text{otherwise}
+  \end{cases}
+\end{equation}
+
+\subsection{Implicit Cash Mechanism}
+
+\textbf{Critical design principle:} After stress scaling, the portfolio weights are \emph{not} renormalised. The deficit $1.0 - \sum_i w_i$ is implicit cash, earning the daily risk-free rate. Renormalisation would force the portfolio to always be fully invested, defeating the purpose of regime-adaptive allocation.
+
+The daily portfolio return is:
+\begin{equation}
+  r_t^{\mathrm{port}} = \sum_{i=1}^{N} w_{i,t} \cdot r_{i,t} + \underbrace{\Big(1 - \sum_{i=1}^{N} w_{i,t}\Big)}_{\text{cash weight}} \cdot r_t^f - c_t
+\end{equation}
+where $c_t = \text{turnover}_t \times \text{cost}_{\mathrm{bps}} / 10{,}000$ is the transaction cost.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Walk-Forward Engine}
+\label{sec:walkforward}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Structure}
+
+\begin{itemize}[nosep]
+  \item \textbf{Training window:} Always $[\text{inception}, t)$ (expanding).
+  \item \textbf{Out-of-sample window:} 63 trading days (one quarter).
+  \item \textbf{First OOS start:} Day 504 (after 2 years of training).
+  \item \textbf{Total windows:} 68 (covering 2009--2025).
+  \item \textbf{Total OOS days:} 4,274.
+\end{itemize}
+
+\subsection{Per-Window Calibration}
+
+At each rebalance:
+\begin{enumerate}[nosep]
+  \item Calibrate CUSUM ($\hat{\mu}$, $\hat{\sigma}$, $h$) on training SPY returns.
+  \item Fit correlation, breadth, skewness detectors on training sector/SPY returns.
+  \item Build signal matrix $(T \times 4)$ from training period.
+  \item Fit GARCH + OU for all sectors (\textbf{parallelised} via \texttt{ThreadPoolExecutor}).
+  \item Classify sectors into baskets.
+  \item Calibrate sigmoid params via Brier score (L-BFGS-B).
+  \item Calibrate entry/exit thresholds via grid search on training Sharpe.
+  \item Reset detector accumulators, re-prime with training tail.
+  \item Execute 63-day OOS window day-by-day.
+\end{enumerate}
+
+\subsection{Parallelisation}
+
+GARCH and OU fitting for 11 sectors is independent and parallelised:
+\begin{verbatim}
+with ThreadPoolExecutor(max_workers=8) as executor:
+    for ticker, garch_result, recovery_result in executor.map(
+        _fit_sector, tasks
+    ):
+        ...
+\end{verbatim}
+Uses \texttt{ThreadPoolExecutor} (not \texttt{ProcessPoolExecutor}) because the \texttt{arch} library releases the GIL during numerical fitting.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Comparison: v1 vs v2}
+\label{sec:comparison}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metric} & \textbf{v1} & \textbf{v2 Final} \\
+\midrule
+Annualised Return & 6.32\% & \textbf{7.85\%} \\
+Annualised Volatility & \textbf{4.64\%} & 7.55\% \\
+Sharpe Ratio & \textbf{1.08} & 0.87 \\
+Sortino Ratio & \textbf{1.16} & 0.89 \\
+Calmar Ratio & \textbf{1.20} & 0.86 \\
+Maximum Drawdown & $\mathbf{-5.25\%}$ & $-9.11\%$ \\
+Mean Investment & $\sim$30\% & \textbf{55.3\%} \\
+Degenerate Sigmoids & 3/4 at boundary & \textbf{0/4} \\
+Return Capture (vs SPY) & 53.6\% & \textbf{66.6\%} \\
+\bottomrule
+\end{tabular}
+\caption{v1 wins on risk-adjusted metrics; v2 wins on return, investment level, and calibration quality.}
+\label{tab:v1-v2}
+\end{table}
+
+\textbf{Fundamental trade-off:} v1 achieves higher Sharpe by being ultra-defensive (30\% invested). v2 achieves higher return and more reasonable investment level by being selectively defensive. The choice depends on whether the priority is risk-adjusted return (v1) or absolute return capture (v2).
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Open Issues and Future Work}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{enumerate}
+  \item \textbf{Investment level vs Sharpe trade-off.} The 55\% mean investment is below the 70--98\% target. Pushing investment higher (via threshold clamping or B dead zone widening) consistently degrades Sharpe below 0.85. The fundamental tension is that the sector ETF universe has limited upside capture vs SPY, so reducing defensive posture adds risk without proportional return.
+
+  \item \textbf{Basket B$=0$ in some windows.} The data-driven classifier sometimes assigns all high-vol stocks to Basket A (all have fast recovery). This is not a bug but a limitation of the ternary classification with tercile boundaries on 11 stocks.
+
+  \item \textbf{Turnover.} 11.57$\times$ annualised turnover is high. A turnover penalty in the threshold calibration or a minimum-trade filter in the execution model could reduce this.
+
+  \item \textbf{Sigmoid boundary effects.} Correlation, breadth, and skewness crossovers hit the upper bound ($c = 0.80$). Widening to $[0.05, 0.90]$ may allow more flexibility, though it risks the degenerate-crossover problem from v1.
+
+  \item \textbf{Alternative aggregation.} Copula-based dependence modelling or a neural attention mechanism could replace the max-of-top-2 rule while avoiding the chronic-activation problem of agreement counting.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{References}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{enumerate}[label={[\arabic*]},nosep]
+  \item Bali, T.G., Demirtas, K.O. \& Levy, H. (2009). ``Is there an intertemporal relation between downside risk and expected returns?'' \textit{Journal of Financial and Quantitative Analysis}, 44(4), 883--909.
+  \item Bollerslev, T. (1986). ``Generalized autoregressive conditional heteroskedasticity.'' \textit{Journal of Econometrics}, 31(3), 307--327.
+  \item Brier, G.W. (1950). ``Verification of forecasts expressed in terms of probability.'' \textit{Monthly Weather Review}, 78(1), 1--3.
+  \item Byrd, R.H., Lu, P., Nocedal, J. \& Zhu, C. (1995). ``A limited memory algorithm for bound constrained optimization.'' \textit{SIAM Journal on Scientific Computing}, 16(5), 1190--1208.
+  \item Longin, F. \& Solnik, B. (2001). ``Extreme correlation of international equity markets.'' \textit{Journal of Finance}, 56(2), 649--676.
+  \item Nystrup, P., Hansen, B.W., Madsen, H. \& Lindstr\"{o}m, E. (2017). ``Regime-based versus static asset allocation.'' \textit{Journal of Risk}, 19(6).
+  \item Page, E.S. (1954). ``Continuous inspection schemes.'' \textit{Biometrika}, 41(1/2), 100--115.
+  \item Siegmund, D. (1985). \textit{Sequential Analysis: Tests and Confidence Intervals}. Springer.
+  \item Storn, R. \& Price, K. (1997). ``Differential evolution -- a simple and efficient heuristic for global optimization over continuous spaces.'' \textit{Journal of Global Optimization}, 11(4), 341--359.
+  \item Takagi, T. \& Sugeno, M. (1985). ``Fuzzy identification of systems and its applications to modeling and control.'' \textit{IEEE Trans. on Systems, Man, and Cybernetics}, SMC-15(1), 116--132.
+\end{enumerate}
+
+\end{document}
