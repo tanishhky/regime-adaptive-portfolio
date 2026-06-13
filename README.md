@@ -1,23 +1,72 @@
 # Regime-Adaptive Sector Portfolio Management
 
-Multi-scale regime detection with fuzzy aggregation for adaptive sector portfolio management. Walk-forward validated over 2009-2025 with zero lookahead bias.
+A **capital-preservation overlay** built on multi-scale regime detection with a
+**2-of-4 detector consensus** rule. Walk-forward validated 2009–2025, zero look-ahead.
 
-**Sharpe 1.08 · Max Drawdown -5.25% · Calmar 1.20** - achieving 53% of SPY's return at 13% of its drawdown risk.
+**What it is for:** minimizing drawdown, not maximizing return. It delivers ~1.7×
+SPY's risk-adjusted return at **one-seventh the drawdown** (−6.2% vs −41.7%) and a
+quarter of the volatility — and the orthogonal architecture **generalizes across
+asset classes**, scoring Sharpe **1.21 on factor portfolios** and **1.04 on
+international equities** versus 0.51 / 0.11 for equal-weight.
 
-## Key Results
+> Numbers below are net of 10 bps/trade costs, on the current orthogonal-detector
+> engine, regenerated from a single data vintage (see `output/`). They reproduce
+> via `python run_pipeline.py` (core) and `python run_robustness.py` (benchmarking).
+
+## Key Results (SPY/sector universe)
 
 | Metric | Regime-Adaptive | SPY (Buy & Hold) |
 |---|---|---|
-| Ann. Return | 6.30% | 11.79% |
-| Ann. Volatility | 4.64% | 17.98% |
-| Sharpe Ratio | **1.08** | 0.58 |
-| Sortino Ratio | **1.15** | 0.54 |
-| Calmar Ratio | **1.20** | 0.28 |
-| Max Drawdown | **-5.25%** | -41.71% |
-| Max DD Duration | **204 days** | 512 days |
-| Ann. Turnover | 10.41x | 0.00 |
+| Ann. Return | 5.80% | 11.79% |
+| Ann. Volatility | **4.64%** | 17.98% |
+| Sharpe Ratio | **0.97** | 0.58 |
+| Sortino Ratio | **1.02** | 0.54 |
+| Calmar Ratio | **0.94** | 0.28 |
+| Max Drawdown | **−6.20%** | −41.71% |
+| Ann. Turnover | 9.85× | 0.00 |
 
-The strategy achieves nearly 2x the Sharpe ratio of SPY by aggressively managing downside risk. During the COVID-19 crash (March 2020), portfolio equity exposure dropped within days of the drawdown onset. The maximum drawdown of -5.25% vs SPY's -41.71% represents an 87% reduction in peak-to-trough loss.
+Sharpe ≈ 1.7× SPY's, achieved by aggressively cutting exposure into stress: during
+the COVID-19 crash equity exposure dropped within days, holding the max drawdown to
+−6.2% against SPY's −41.7% (an 85% reduction in peak-to-trough loss).
+
+## Honest Benchmarking
+
+A capital-preservation system should be judged against the alternatives — including
+trivially simple ones. It is, here, with no cherry-picking:
+
+| Strategy | Sharpe | Calmar | Max DD | Ann. Vol |
+|---|---|---|---|---|
+| Regime-Adaptive | 0.97 | 0.94 | **−6.2%** | **4.6%** |
+| MA Timing (200d) | **1.24** | **1.44** | −10.3% | 10.9% |
+| Drawdown Control | 1.21 | 1.76 | −8.5% | 11.3% |
+| Vol Targeting | 0.49 | 0.32 | −22.3% | 12.1% |
+| Risk Parity | 0.45 | 0.19 | −43.7% | 15.3% |
+| SPY (Buy & Hold) | 0.58 | 0.28 | −41.7% | 18.0% |
+
+Read honestly: on the **SPY universe alone**, simple trend rules (200-day MA,
+drawdown-control) post higher *raw* Sharpe — this system's edge there is the
+**lowest drawdown and lowest volatility of any approach tested**, which is the
+objective it is built for. The case for the multi-detector machinery is two-fold:
+
+1. **It is not a SPY-tuned rule.** A 200-day MA is fit to one series; this
+   architecture is parameter-light and universe-agnostic — see generalization below.
+2. **Consensus, not a single signal.** The aggregator (below) requires *two of four*
+   orthogonal detectors to agree before it acts, so no single noisy indicator can
+   move the book — a structural false-alarm suppressor a single-rule system lacks.
+
+## Cross-Asset Generalization
+
+The same architecture — calibrated only on training data per universe — transfers
+to asset classes it was never designed on, far outperforming equal-weight:
+
+| Universe | Strategy Sharpe | Equal-Weight Sharpe | Strategy Max DD | EW Max DD |
+|---|---|---|---|---|
+| **Factor portfolios** | **1.21** | 0.51 | −6.1% | −44.4% |
+| **International equities** | **1.04** | 0.11 | −7.3% | −58.3% |
+| Multi-Asset | 0.45 | 0.26 | −14.3% | −25.1% |
+
+This is the real justification for the orthogonal-detector design: it generalizes,
+where a rule tuned to one index does not.
 
 ## How It Works
 

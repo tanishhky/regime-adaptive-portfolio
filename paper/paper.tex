@@ -47,22 +47,31 @@ New York, NY, USA
 \begin{abstract}
 \noindent
 We propose a multi-scale regime detection framework that fuses four
-complementary detectors---CUSUM sequential analysis on z-score
-returns, EWMA volatility crossover, Hamilton Markov-switching with a
-recursive out-of-sample filter, and PELT structural break
-detection---into a unified stress probability via Takagi-Sugeno fuzzy
-inference with bounded L-BFGS-B optimization.  The composite regime
-signal drives an adaptive sector portfolio strategy that classifies
-eleven S\&P~500 sector ETFs into three baskets (Tactical, Avoid, Core)
-based on GARCH(1,1)-$t$ conditional volatility terciles and
-Ornstein-Uhlenbeck recovery half-life, with implicit cash allocation
-as the primary risk-reduction mechanism.  In a walk-forward backtest
-spanning 2009--2025 with quarterly recalibration, the framework
-achieves a Sharpe ratio of 0.78, a maximum drawdown of $-19.60\%$
-(versus $-41.71\%$ for SPY), and a Calmar ratio of 0.59, while
-capturing 98\% of the benchmark return at 73\% of its volatility.
-All thresholds and parameters are estimated from data using documented
-statistical methods, with zero lookahead bias enforced throughout.
+\emph{orthogonal} stress detectors---CUSUM sequential analysis on
+z-score returns (magnitude), rolling cross-sector correlation
+(structure / contagion), market breadth (participation), and rolling
+return skewness (left-tail asymmetry)---into a unified stress
+probability via sigmoid-membership fuzzy inference. Crucially, the
+aggregator uses a \emph{max-of-top-2} rule: it returns the
+second-largest membership, so at least two orthogonal detectors must
+agree before the system acts, structurally suppressing single-detector
+false alarms. The composite signal drives an adaptive sector portfolio
+that classifies eleven S\&P~500 sector ETFs into three baskets
+(Tactical, Avoid, Core) by GARCH(1,1)-$t$ conditional-volatility
+terciles and Ornstein-Uhlenbeck recovery half-life, with implicit cash
+allocation as the primary risk-reduction mechanism. In a walk-forward
+backtest (2009--2025, quarterly recalibration, 10 bps/trade, zero
+look-ahead), the framework is best understood as a
+\emph{capital-preservation overlay}: it holds maximum drawdown to
+$-6.2\%$ (versus $-41.7\%$ for SPY) at $4.6\%$ annualized volatility,
+for a Sharpe of $0.97$ (versus SPY's $0.58$) and Calmar $0.94$.
+Benchmarked honestly, simple trend rules achieve higher \emph{raw}
+Sharpe on the SPY universe; the architecture's distinctive value is
+\emph{generalization}---applied unchanged to factor portfolios and
+international equities it scores Sharpe $1.21$ and $1.04$ against
+$0.51$ and $0.11$ for equal-weight, where a single index-tuned rule
+would not transfer. All parameters are estimated from data with zero
+look-ahead bias enforced throughout.
 
 \medskip
 \noindent\textbf{Keywords:} regime detection, fuzzy inference, portfolio management, CUSUM, Markov switching, GARCH, walk-forward validation, implicit cash allocation
