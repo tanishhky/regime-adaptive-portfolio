@@ -47,10 +47,10 @@ New York, NY, USA
 \begin{abstract}
 \noindent
 We propose a multi-scale regime detection framework that fuses four
-\emph{orthogonal} stress detectors---CUSUM sequential analysis on
+\emph{orthogonal} stress detectors - CUSUM sequential analysis on
 z-score returns (magnitude), rolling cross-sector correlation
 (structure / contagion), market breadth (participation), and rolling
-return skewness (left-tail asymmetry)---into a unified stress
+return skewness (left-tail asymmetry) - into a unified stress
 probability via sigmoid-membership fuzzy inference. Crucially, the
 aggregator uses a \emph{max-of-top-2} rule: it returns the
 second-largest membership, so at least two orthogonal detectors must
@@ -60,14 +60,14 @@ that classifies eleven S\&P~500 sector ETFs into three baskets
 (Tactical, Avoid, Core) by GARCH(1,1)-$t$ conditional-volatility
 terciles and Ornstein-Uhlenbeck recovery half-life, with implicit cash
 allocation as the primary risk-reduction mechanism. In a walk-forward
-backtest (2009--2025, quarterly recalibration, 10 bps/trade, zero
+backtest (2009-2025, quarterly recalibration, 10 bps/trade, zero
 look-ahead), the framework is best understood as a
 \emph{capital-preservation overlay}: it holds maximum drawdown to
 $-6.2\%$ (versus $-41.7\%$ for SPY) at $4.6\%$ annualized volatility,
 for a Sharpe of $0.97$ (versus SPY's $0.58$) and Calmar $0.94$.
 Benchmarked honestly, simple trend rules achieve higher \emph{raw}
 Sharpe on the SPY universe; the architecture's distinctive value is
-\emph{generalization}---applied unchanged to factor portfolios and
+\emph{generalization} - applied unchanged to factor portfolios and
 international equities it scores Sharpe $1.21$ and $1.04$ against
 $0.51$ and $0.11$ for equal-weight, where a single index-tuned rule
 would not transfer. All parameters are estimated from data with zero
@@ -98,7 +98,7 @@ idiosyncratic volatility, while long-term models react too slowly to
 protect against rapid drawdowns.  The secondary challenge is
 translating regime signals into portfolio actions that actually reduce
 risk: a system that detects stress but merely redistributes weight
-among risky assets---rather than moving to cash---provides limited
+among risky assets - rather than moving to cash - provides limited
 drawdown protection.
 
 This paper addresses both challenges.  We propose an ensemble
@@ -110,7 +110,7 @@ primary risk-reduction mechanism.
 Our contributions are fourfold:
 \begin{enumerate}[itemsep=2pt]
     \item A four-detector ensemble spanning complementary, orthogonal
-          dimensions of stress---CUSUM on z-score-standardized returns
+          dimensions of stress - CUSUM on z-score-standardized returns
           (magnitude, scale-invariant), cross-sector correlation
           (structure), market breadth (participation), and rolling
           return skewness (left-tail asymmetry, leading).
@@ -147,8 +147,8 @@ systems for financial decision-making under uncertainty.  The
 sigmoid-membership fuzzy framework \citep{takagi1985} provides a
 principled approach to combining multiple information sources with
 calibratable membership functions.  Our work adapts this with a
-\emph{weightless} max-of-top-2 consensus---calibrating only membership
-shape parameters, with no detector weights---to
+\emph{weightless} max-of-top-2 consensus - calibrating only membership
+shape parameters, with no detector weights - to
 prevent degenerate solutions.
 
 \citet{nystrup2017} showed that regime-based asset allocation
@@ -199,7 +199,7 @@ four detectors over the full out-of-sample period, demonstrating how
 their complementary time-scales capture different aspects of market
 stress.
 
-\subsubsection{CUSUM Sequential Detector (5--10 day)}
+\subsubsection{CUSUM Sequential Detector (5-10 day)}
 Following \citet{page1954}, we maintain upward and downward CUSUM
 accumulators on \emph{z-score-standardized} returns:
 \begin{equation}
@@ -222,13 +222,13 @@ single $-5\%$ daily return (approximately $z = -4.2$) produces a signal
 of $\sim\!0.55$, while three consecutive $-2\%$ days ($z \approx -1.7$
 each) yield a signal of $\sim\!0.54$.  Under the original raw-return
 formulation, the threshold was approximately 558, requiring over
-12{,}000 consecutive crash days to trigger---rendering the detector
+12{,}000 consecutive crash days to trigger - rendering the detector
 inoperative.
 
 \subsubsection{Cross-Sector Correlation (21-day)}
 We compute the average pairwise Pearson correlation across the eleven
 sector ETFs over a rolling 21-day window. Rising average correlation
-signals diversification collapse and contagion---a dimension of stress
+signals diversification collapse and contagion - a dimension of stress
 distinct in kind from return magnitude. The raw correlation is mapped
 linearly from $[0.10, 0.60]$ to $[0,1]$ and clipped. This detector also
 serves as a structural-break proxy: when its signal exceeds $0.5$,
@@ -239,7 +239,7 @@ Breadth measures \emph{participation}: the fraction of the eleven
 sectors with negative cumulative returns over a rolling 21-day window,
 mapped linearly from $[0.05, 0.50]$ to $[0,1]$. It is orthogonal to
 CUSUM because it captures \emph{how many} sectors are declining, not
-how far any single one has moved---broad, shallow weakness scores high
+how far any single one has moved - broad, shallow weakness scores high
 here while one violent sector move does not.
 
 \subsubsection{Return Skewness (63-day)}
@@ -259,15 +259,15 @@ sigmoid membership function:
 \end{equation}
 where $a_i$ (steepness) and $c_i$ (crossover point) are per-detector
 parameters. Rather than a weighted sum, the composite stress
-probability is the \emph{second-largest} membership---a max-of-top-2,
+probability is the \emph{second-largest} membership - a max-of-top-2,
 or 2-of-4 consensus, rule:
 \begin{equation}
     P(\text{stress}) = \mu_{(2)}, \qquad
     \mu_{(1)} \ge \mu_{(2)} \ge \mu_{(3)} \ge \mu_{(4)} .
 \end{equation}
 This requires at least two of the four orthogonal detectors to show
-elevated stress before the system acts: a single detector firing---a
-likely false alarm---leaves the second-largest membership low. The
+elevated stress before the system acts: a single detector firing - a
+likely false alarm - leaves the second-largest membership low. The
 design is deliberately \emph{weightless}; there are no detector weights
 to over-fit, only the sigmoid shape parameters are learned, and no
 single detector can move the portfolio on its own.
@@ -415,7 +415,7 @@ January 2009 to December 2025.
 \subsection{Portfolio Performance}
 
 \begin{table}[H]
-\caption{Walk-Forward Out-of-Sample Performance (2009--2025)}
+\caption{Walk-Forward Out-of-Sample Performance (2009-2025)}
 \label{tab:performance}
 \centering
 \begin{tabular}{lcc}
@@ -429,7 +429,7 @@ Sortino Ratio       & \textbf{1.02}      & 0.54      \\
 Calmar Ratio        & \textbf{0.94}      & 0.28      \\
 Max Drawdown        & \textbf{$-$6.20\%} & $-$41.71\%\\
 Max DD Duration     & 354d               & 512d      \\
-Ann.\ Turnover      & 9.85               & ---       \\
+Ann.\ Turnover      & 9.85               & -       \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -437,15 +437,15 @@ Ann.\ Turnover      & 9.85               & ---       \\
 Table~\ref{tab:performance} summarizes the out-of-sample results. The
 system is best read as a \emph{capital-preservation overlay}: it holds
 maximum drawdown to $-6.2\%$ against SPY's $-41.7\%$ (an 85\% reduction)
-at $4.6\%$ annualized volatility---roughly a quarter of SPY's---for a
+at $4.6\%$ annualized volatility - roughly a quarter of SPY's - for a
 Sharpe of $0.97$ versus $0.58$ and a Calmar of $0.94$ versus $0.28$.
 It does so by trading return for risk: annualized return is $5.8\%$,
 about half of buy-and-hold, but achieved with a fraction of the
 downside.
 
 \paragraph{Honest benchmarking.} Judged against simple alternatives on
-the SPY/sector universe, two trend-following rules---a 200-day moving
-average and a drawdown-control overlay---post higher \emph{raw} Sharpe
+the SPY/sector universe, two trend-following rules - a 200-day moving
+average and a drawdown-control overlay - post higher \emph{raw} Sharpe
 ($\sim$1.24 and 1.21). The regime-adaptive system's edge on this
 universe is the \emph{lowest} drawdown and volatility of any approach
 tested, which is the objective it is designed for; it is not presented
@@ -454,13 +454,13 @@ generalization (next subsection): a moving average is tuned to one
 series, whereas the consensus ensemble transfers across asset classes.
 
 Figure~\ref{fig:backtest} shows the cumulative equity curves alongside
-the strategy's drawdown profile---tracking SPY's broad path while
+the strategy's drawdown profile - tracking SPY's broad path while
 holding drawdowns far shallower through every stress episode.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{backtest.png}
-\caption{Walk-forward out-of-sample backtest (2009--2025).  Top:
+\caption{Walk-forward out-of-sample backtest (2009-2025).  Top:
 cumulative returns for the regime-adaptive strategy versus SPY
 buy-and-hold.  Bottom: strategy drawdown profile.  The strategy
 tracks SPY's broad path while holding maximum drawdowns
@@ -474,7 +474,7 @@ Figure~\ref{fig:rolling} shows the 252-day rolling Sharpe ratio for
 both the regime-adaptive strategy and SPY.  The strategy maintains a
 consistently higher rolling Sharpe, with particularly large
 outperformance during and immediately after stress periods
-(2009--2010, 2020, 2022).  The rolling Sharpe rarely drops below zero
+(2009-2010, 2020, 2022).  The rolling Sharpe rarely drops below zero
 for the adaptive strategy, whereas SPY experiences extended
 negative-Sharpe periods during drawdowns.
 
@@ -503,12 +503,12 @@ shows the resulting portfolio drawdown profile.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{regime_detection.png}
-\caption{Multi-scale regime detection system (2009--2025).  From top:
+\caption{Multi-scale regime detection system (2009-2025).  From top:
 (1)~SPY price with regime shading (green = calm, red = stress);
 (2)~individual detector signals showing complementary time-scales;
 (3)~composite $P(\text{stress})$ from fuzzy aggregation with 0.5
 threshold marked; (4)~portfolio drawdown profile.  The system
-identifies major stress events (2011 European debt crisis, 2015--16
+identifies major stress events (2011 European debt crisis, 2015-16
 China/oil shock, 2018 Q4, COVID-19, 2022 rate hikes) with distinct
 multi-scale signatures.}
 \label{fig:regime}
@@ -518,13 +518,13 @@ Figure~\ref{fig:heatmap} provides a complementary view via a detector
 intensity heatmap. CUSUM shows sparse, intense activations during sharp
 crashes; correlation darkens when sectors move together (contagion);
 breadth elevates during broad, shallow weakness; and skewness builds
-ahead of left-tail episodes---each capturing a distinct, orthogonal
+ahead of left-tail episodes - each capturing a distinct, orthogonal
 facet of stress.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{detector_heatmap.png}
-\caption{Detector signal intensity heatmap (2009--2025). Each row is one
+\caption{Detector signal intensity heatmap (2009-2025). Each row is one
 detector; color intensity indicates signal strength from 0 (pale) to 1
 (dark red). The four detectors capture orthogonal dimensions: CUSUM
 (magnitude), correlation (structure), breadth (participation), and
@@ -542,7 +542,7 @@ Sharpe $1.21$ on factor portfolios and $1.04$ on international equities,
 versus $0.51$ and $0.11$ for EW, with drawdowns a fraction of the
 benchmark's. A single index-tuned rule (e.g.\ a 200-day moving average)
 does not generalize this way; the orthogonal, parameter-light consensus
-ensemble does. This---not raw Sharpe on the SPY universe---is the
+ensemble does. This - not raw Sharpe on the SPY universe - is the
 justification for the architecture's complexity.
 
 \begin{table}[H]
@@ -564,8 +564,8 @@ Multi-Asset           & 0.45          & 0.26 & $-14.3\%$ & $-25.1\%$ \\
 
 Figure~\ref{fig:recovery} illustrates sector-level recovery paths
 during the two major drawdown episodes in the sample: COVID-19
-(February--September 2020) and the 2022 rate-hiking cycle
-(January 2022--January 2023).  Sectors are colored by their basket
+(February-September 2020) and the 2022 rate-hiking cycle
+(January 2022-January 2023).  Sectors are colored by their basket
 assignment, demonstrating the empirical validity of the classification:
 Basket~A (Tactical, red) sectors recover fastest from the COVID
 trough, while Basket~B (Avoid, orange) sectors exhibit the slowest
@@ -594,9 +594,9 @@ demonstrating regime-dependent sector dynamics.}
 A key design insight is that portfolio weight normalization can
 \emph{negate} regime-responsive behavior.  In the standard approach,
 inverse-volatility weights for $N$ assets produce raw sums of
-$\sim 20$--$30$.  When stressed assets are de-weighted and the result
+$\sim 20$-$30$.  When stressed assets are de-weighted and the result
 is normalized to sum to 1.0, the freed capacity is redistributed
-proportionally to all surviving positions---including those in the
+proportionally to all surviving positions - including those in the
 ``hold'' basket.  This means the portfolio \emph{increases} its
 allocation to Core assets during stress, which is the opposite of
 risk reduction.  Our approach normalizes base weights to 1.0 before
@@ -620,7 +620,7 @@ signal of 0.55.
 The framework has several limitations.  First, the annualized turnover
 of 4.01$\times$ creates transaction cost drag.  While the 10~bps
 assumption is conservative for liquid ETFs (typical bid-ask spreads of
-1--2~bps), higher-frequency strategies or less liquid instruments
+1-2~bps), higher-frequency strategies or less liquid instruments
 would face larger friction.  Second, the quarterly recalibration
 frequency may be insufficient to capture rapidly evolving market
 dynamics; event-driven recalibration could improve responsiveness.
@@ -637,7 +637,7 @@ All parameters are re-estimated at each walk-forward step using only
 past data, ensuring that the results are not affected by lookahead
 bias.  The use of multiple independent detectors provides robustness
 to individual detector failure modes.  The weightless max-of-top-2
-consensus---requiring two of four orthogonal detectors to agree---
+consensus - requiring two of four orthogonal detectors to agree - 
 structurally prevents any single (possibly faulty) detector from moving
 the portfolio, with no detector weights to over-fit.  The implicit cash
 mechanism provides a natural risk-reduction pathway that does not
@@ -654,7 +654,7 @@ capital-preservation overlay, the walk-forward validated results hold
 maximum drawdown to $-$6.2\% (versus $-$41.7\% for SPY) at a quarter of
 the volatility, for a Sharpe of 0.97 versus 0.58. Reported honestly,
 simple trend rules achieve higher raw Sharpe on the SPY universe; the
-architecture's distinctive value is that it \emph{generalizes}---scoring
+architecture's distinctive value is that it \emph{generalizes} - scoring
 Sharpe 1.21 and 1.04 on factor and international universes versus
 0.51/0.11 for equal-weight, where an index-tuned rule would not transfer.
 
@@ -670,8 +670,8 @@ The framework's value lies not in predicting market direction but in
 reliably detecting the \emph{onset} of stress and responding with
 genuine risk reduction. During the COVID-19 crash the portfolio moved
 sharply to cash within days of the drawdown onset and gradually
-re-entered during recovery. This asymmetric response---fast to de-risk,
-gradual to re-risk---is the primary driver of the improved risk-adjusted
+re-entered during recovery. This asymmetric response - fast to de-risk,
+gradual to re-risk - is the primary driver of the improved risk-adjusted
 profile.
 
 Future work may explore: (1)~event-driven recalibration triggered by
@@ -689,53 +689,53 @@ the implicit cash mechanism.
 \bibitem[Ang and Bekaert(2002)]{ang2002}
 A.~Ang and G.~Bekaert.
 \newblock International asset allocation with regime shifts.
-\newblock \emph{Review of Financial Studies}, 15(4):1137--1187, 2002.
+\newblock \emph{Review of Financial Studies}, 15(4):1137-1187, 2002.
 
 \bibitem[Bollerslev(1986)]{bollerslev1986}
 T.~Bollerslev.
 \newblock Generalized autoregressive conditional heteroskedasticity.
-\newblock \emph{Journal of Econometrics}, 31(3):307--327, 1986.
+\newblock \emph{Journal of Econometrics}, 31(3):307-327, 1986.
 
 \bibitem[Brier(1950)]{brier1950}
 G.~W. Brier.
 \newblock Verification of forecasts expressed in terms of probability.
-\newblock \emph{Monthly Weather Review}, 78(1):1--3, 1950.
+\newblock \emph{Monthly Weather Review}, 78(1):1-3, 1950.
 
 \bibitem[Engle(1982)]{engle1982}
 R.~F. Engle.
 \newblock Autoregressive conditional heteroscedasticity with estimates
   of the variance of {United Kingdom} inflation.
-\newblock \emph{Econometrica}, 50(4):987--1007, 1982.
+\newblock \emph{Econometrica}, 50(4):987-1007, 1982.
 
 \bibitem[Fama and French(2015)]{fama2015}
 E.~F. Fama and K.~R. French.
 \newblock A five-factor model of expected stock returns.
-\newblock \emph{Journal of Financial Economics}, 116(1):1--22, 2015.
+\newblock \emph{Journal of Financial Economics}, 116(1):1-22, 2015.
 
 \bibitem[Gradojevic and Gen\c{c}ay(2013)]{gradojevic2013}
 N.~Gradojevic and R.~Gen\c{c}ay.
 \newblock Fuzzy logic, trading uncertainty, and technical trading.
-\newblock \emph{Journal of Banking \& Finance}, 37(2):578--586, 2013.
+\newblock \emph{Journal of Banking \& Finance}, 37(2):578-586, 2013.
 
 \bibitem[Hamilton(1989)]{hamilton1989}
 J.~D. Hamilton.
 \newblock A new approach to the economic analysis of nonstationary time
   series and the business cycle.
-\newblock \emph{Econometrica}, 57(2):357--384, 1989.
+\newblock \emph{Econometrica}, 57(2):357-384, 1989.
 
 \bibitem[Killick et~al.(2012)]{killick2012}
 R.~Killick, P.~Fearnhead, and I.~A. Eckley.
 \newblock Optimal detection of changepoints with a linear computational
   cost.
 \newblock \emph{Journal of the American Statistical Association},
-  107(500):1590--1598, 2012.
+  107(500):1590-1598, 2012.
 
 \bibitem[Kirby and Ostdiek(2012)]{kirby2012}
 C.~Kirby and B.~Ostdiek.
 \newblock It's all in the timing: Simple active portfolio strategies
   that outperform na\"ive diversification.
 \newblock \emph{Journal of Financial and Quantitative Analysis},
-  47(2):437--467, 2012.
+  47(2):437-467, 2012.
 
 \bibitem[Longerstaey and Spencer(1996)]{longerstaey1996}
 J.~Longerstaey and M.~Spencer.
@@ -751,7 +751,7 @@ P.~Nystrup, B.~W. Hansen, H.~Madsen, and E.~Lindstr\"{o}m.
 \bibitem[Page(1954)]{page1954}
 E.~S. Page.
 \newblock Continuous inspection schemes.
-\newblock \emph{Biometrika}, 41(1/2):100--115, 1954.
+\newblock \emph{Biometrika}, 41(1/2):100-115, 1954.
 
 \bibitem[Siegmund(1985)]{siegmund1985}
 D.~Siegmund.
@@ -763,7 +763,7 @@ T.~Takagi and M.~Sugeno.
 \newblock Fuzzy identification of systems and its applications to
   modeling and control.
 \newblock \emph{IEEE Transactions on Systems, Man, and Cybernetics},
-  (1):116--132, 1985.
+  (1):116-132, 1985.
 
 \bibitem[Uhlenbeck and Ornstein(1930)]{uhlenbeck1930}
 G.~E. Uhlenbeck and L.~S. Ornstein.
