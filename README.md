@@ -1,5 +1,7 @@
 # Regime-Adaptive Sector Portfolio Management
 
+![tests](https://github.com/tanishhky/regime-adaptive-portfolio/actions/workflows/tests.yml/badge.svg)
+
 A **capital-preservation overlay** built on multi-scale regime detection with a
 **2-of-4 detector consensus** rule. Walk-forward validated 2009–2025, zero look-ahead.
 
