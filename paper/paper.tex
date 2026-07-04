@@ -533,6 +533,7 @@ skewness (tail asymmetry).}
 \end{figure}
 
 \subsection{Cross-Asset Generalization}
+\label{sec:crossasset}
 
 The strongest evidence for the multi-detector design is that it
 \emph{transfers}. Calibrated only on training data, the same
@@ -631,18 +632,74 @@ Fourth, the backtest spans a single macroeconomic epoch (post-GFC
 monetary expansion); performance in structurally different interest
 rate environments requires further validation.
 
-\subsection{Robustness}
+\subsection{Robustness and Ablation}
 
 All parameters are re-estimated at each walk-forward step using only
 past data, ensuring that the results are not affected by lookahead
-bias.  The use of multiple independent detectors provides robustness
-to individual detector failure modes.  The weightless max-of-top-2
-consensus - requiring two of four orthogonal detectors to agree - 
-structurally prevents any single (possibly faulty) detector from moving
-the portfolio, with no detector weights to over-fit.  The implicit cash
-mechanism provides a natural risk-reduction pathway that does not
-depend on correctly predicting the \emph{type} of stress, only its
-\emph{presence}.
+bias.  The weightless max-of-top-2 consensus - requiring two of four
+orthogonal detectors to agree - structurally prevents any single
+(possibly faulty) detector from moving the portfolio, with no detector
+weights to over-fit.  The implicit cash mechanism provides a natural
+risk-reduction pathway that does not depend on correctly predicting the
+\emph{type} of stress, only its \emph{presence}.
+
+That claim is now backed by a full ablation
+(Table~\ref{tab:ablation}): the walk-forward backtest re-run with every
+detector subset, where single-detector arms use the top-1 rule (their
+own membership drives allocation directly - the \emph{favorable}
+interpretation, since under the production 2-of-4 rule a lone detector
+could never act), and multi-detector arms keep the production
+consensus.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Configuration} & \textbf{Rule} & \textbf{Sharpe} & \textbf{MaxDD} & \textbf{Calmar} & \textbf{Days stressed} \\
+\midrule
+full ensemble (2-of-4) & top-2 & 1.25 & $-6.2\%$  & 0.94 & 29\% \\
+\midrule
+breadth only      & top-1 & 1.69 & $-4.5\%$  & 1.83 & 31\% \\
+CUSUM only        & top-1 & 0.87 & $-11.4\%$ & 0.44 & 4\%  \\
+skewness only     & top-1 & 0.77 & $-11.8\%$ & 0.41 & 20\% \\
+correlation only  & top-1 & 0.57 & $-7.9\%$  & 0.31 & 51\% \\
+\midrule
+without breadth      & top-2 & 0.76 & $-11.7\%$ & 0.36 & 12\% \\
+without correlation  & top-2 & 1.10 & $-11.2\%$ & 0.56 & 10\% \\
+without CUSUM        & top-2 & 1.24 & $-7.5\%$  & 0.82 & 28\% \\
+without skewness     & top-2 & 1.32 & $-6.5\%$  & 0.99 & 22\% \\
+\bottomrule
+\end{tabular}
+\caption{Detector ablation, walk-forward out of sample (SPY sector
+universe, 2009-2025). Sharpe here is computed on total returns (no
+risk-free deduction), so values are comparable \emph{within} this table
+but not to the excess-return headline table. Single-detector arms use
+the top-1 rule.}
+\label{tab:ablation}
+\end{table}
+
+Three honest readings. \textbf{First}, the consensus is \emph{not} the
+Sharpe-maximizer on this universe: breadth alone posts the best single
+run (Sharpe 1.69, drawdown $-4.5\%$), which echoes the earlier caveat
+that simple trend-adjacent rules win raw Sharpe on the SPY universe -
+breadth (the fraction of sectors with negative trailing returns) is
+itself trend-adjacent. \textbf{Second}, picking a single detector is a
+bet, not a strategy: the four singles span Sharpe 0.57 to 1.69 and
+three of four suffer roughly double the ensemble's drawdown, and there
+was no ex-ante reason to know breadth would be the winner on this
+sample. The consensus buys insurance against exactly that selection
+risk, at a cost of about 0.4 Sharpe versus the best single arm chosen
+in hindsight. \textbf{Third}, the leave-one-out rows identify the
+load-bearing parts: removing breadth collapses performance (1.25 to
+0.76), removing correlation nearly doubles the drawdown ($-6.2\%$ to
+$-11.2\%$), while removing skewness is slightly Sharpe-positive here -
+the ensemble carries it for its leading-indicator role, and its
+marginal contribution on this universe is admittedly small. Whether the
+breadth-only rule transfers to the factor and international universes
+the way the consensus does (Section~\ref{sec:crossasset}) is the natural next
+experiment; the consensus's cross-asset generalization remains its
+distinctive, tested property.
 
 % ─── CONCLUSION ──────────────────────────────────────────────────────────────
 \section{Conclusion}

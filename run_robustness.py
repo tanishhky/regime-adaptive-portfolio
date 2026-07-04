@@ -42,7 +42,7 @@ def run_ablation(prices, ff_data):
     print("\n" + "=" * 60)
     print("PHASE 1: ABLATION STUDY")
     print("=" * 60)
-    from src.robustness.ablation import run_all_ablations
+    from src.robustness.ablation import run_ablation as run_all_ablations
     t0 = time.time()
     df = run_all_ablations(prices, ff_data)
     print(f"\n{df.to_string(index=False)}")
