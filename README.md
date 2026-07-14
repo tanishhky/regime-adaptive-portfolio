@@ -302,12 +302,16 @@ Every parameter in the system is estimated from data at runtime. There are zero 
 
 ## Citation
 
+Available as an SSRN preprint:
+[Abstract ID 6484679](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6484679).
+
 ```bibtex
-@article{yadav2025regime,
+@article{yadav2026regime,
   title={Multi-Scale Regime Detection with Fuzzy Aggregation for Adaptive Sector Portfolio Management},
   author={Yadav, Tanishk},
-  year={2025},
-  institution={NYU Tandon School of Engineering}
+  year={2026},
+  institution={NYU Tandon School of Engineering},
+  note={SSRN Working Paper No. 6484679}
 }
 ```
 

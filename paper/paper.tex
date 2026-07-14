@@ -4,26 +4,28 @@
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{hyperref}
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{multirow}
 \usepackage{natbib}
-\usepackage{setspace}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{enumitem}
 \usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
 
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue!70!black,
-    citecolor=blue!70!black,
-    urlcolor=blue!70!black,
-}
+\definecolor{accent}{HTML}{B07D1F}
+\titleformat{\section}{\large\bfseries\color{accent}}{\thesection}{0.6em}{}
+\captionsetup{font=small, labelfont=bf}
 
-\onehalfspacing
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\itshape Regime-Adaptive Portfolio}
+\fancyhead[R]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
 
 % Figures are in paper/fig/ or output/figures/
 \graphicspath{{fig/}{paper/fig/}{../output/figures/}{output/figures/}}
@@ -37,11 +39,12 @@ NYU Tandon School of Engineering\\
 New York, NY, USA
 }
 
-\date{}
+\date{July 2026}
 
 \begin{document}
 
 \maketitle
+\thispagestyle{fancy}
 
 % ─── ABSTRACT ────────────────────────────────────────────────────────────────
 \begin{abstract}
