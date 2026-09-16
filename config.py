@@ -8,7 +8,7 @@ fixed transaction costs) that define the experimental setup.
 
 # ── Date range ────────────────────────────────────────────────────────────────
 DATA_START_DATE: str = "2007-01-01"   # Pre-GFC for regime diversity
-DATA_END_DATE: str = "2025-12-31"
+DATA_END_DATE: str = "2026-08-29"     # extended for OOS re-run (was 2025-12-31)
 
 # ── Walk-forward parameters (trading days) ────────────────────────────────────
 WALK_FORWARD_MIN_TRAIN: int = 504    # 2 years minimum training window
