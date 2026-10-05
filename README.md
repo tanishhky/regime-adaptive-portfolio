@@ -2,6 +2,8 @@
 
 ![tests](https://github.com/tanishhky/regime-adaptive-portfolio/actions/workflows/tests.yml/badge.svg)
 
+**Paper, figures and summary:** [tanishkyadav.me/research/regime-detection](https://www.tanishkyadav.me/research/regime-detection)
+
 A **capital-preservation overlay** built on multi-scale regime detection with a
 **2-of-4 detector consensus** rule. Walk-forward validated 2009–2025, zero look-ahead.
 
